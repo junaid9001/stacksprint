@@ -5,6 +5,9 @@ import { useEffect, useMemo, useState } from 'react';
 type Service = { name: string; port: number };
 type ToggleItem = { key: string; label: string };
 type CustomFileEntry = { path: string; content: string };
+type SavedPreset = { name: string; config: Record<string, unknown> };
+
+const PRESET_STORAGE_KEY = 'stacksprint_presets_v1';
 
 const infraKeys: ToggleItem[] = [
   { key: 'redis', label: 'Redis' },
@@ -68,6 +71,9 @@ export default function Page() {
   const [bashScript, setBashScript] = useState('');
   const [powerShellScript, setPowerShellScript] = useState('');
   const [filePaths, setFilePaths] = useState<string[]>([]);
+  const [warnings, setWarnings] = useState<string[]>([]);
+  const [presetName, setPresetName] = useState('');
+  const [presets, setPresets] = useState<SavedPreset[]>([]);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [previewLoading, setPreviewLoading] = useState(false);
@@ -95,7 +101,9 @@ export default function Page() {
     file_toggles: fileToggles,
     custom: {
       add_folders: parseCsv(customFolders),
-      add_files: customFileEntries.filter((item) => item.path.trim() !== '').map((item) => ({ path: item.path.trim(), content: item.content })),
+      add_files: customFileEntries
+        .filter((item) => item.path.trim() !== '')
+        .map((item) => ({ path: item.path.trim(), content: item.content })),
       add_service_names: services.map((s) => s.name),
       remove_folders: parseCsv(removeFolders),
       remove_files: parseCsv(removeFiles)
@@ -128,6 +136,19 @@ export default function Page() {
     moduleName
   ]);
 
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem(PRESET_STORAGE_KEY);
+      if (!raw) return;
+      const parsed = JSON.parse(raw) as SavedPreset[];
+      if (Array.isArray(parsed)) {
+        setPresets(parsed);
+      }
+    } catch {
+      setPresets([]);
+    }
+  }, []);
+
   async function fetchScripts(mode: 'manual' | 'preview', signal?: AbortSignal) {
     if (mode === 'manual') {
       setLoading(true);
@@ -152,6 +173,7 @@ export default function Page() {
       setBashScript(body.bash_script || '');
       setPowerShellScript(body.powershell_script || '');
       setFilePaths(Array.isArray(body.file_paths) ? body.file_paths : []);
+      setWarnings(Array.isArray(body.warnings) ? body.warnings : []);
     } catch (e) {
       if ((e as Error).name !== 'AbortError') {
         setError(String(e));
@@ -202,6 +224,61 @@ export default function Page() {
     });
   }
 
+  function persistPresets(next: SavedPreset[]) {
+    setPresets(next);
+    localStorage.setItem(PRESET_STORAGE_KEY, JSON.stringify(next));
+  }
+
+  function savePreset() {
+    const name = presetName.trim();
+    if (!name) {
+      setError('Preset name is required.');
+      return;
+    }
+    const next = [{ name, config: payload }, ...presets.filter((p) => p.name !== name)];
+    persistPresets(next);
+    setPresetName('');
+  }
+
+  function applyPreset(config: Record<string, unknown>) {
+    setLanguage((config.language as string) || 'go');
+    setFramework((config.framework as string) || 'fiber');
+    setArchitecture((config.architecture as string) || 'mvp');
+    setDb((config.db as string) || 'postgresql');
+    setUseORM(Boolean(config.use_orm));
+    setServiceCommunication((config.service_communication as string) || 'none');
+
+    const cfgServices = (config.services as Service[]) || [];
+    setServices(cfgServices.length > 0 ? cfgServices : [{ name: 'users', port: 8081 }, { name: 'orders', port: 8082 }]);
+
+    setInfra((config.infra as { redis: boolean; kafka: boolean; nats: boolean }) || { redis: false, kafka: false, nats: false });
+    setFeatures((config.features as typeof features) || features);
+    setFileToggles((config.file_toggles as typeof fileToggles) || fileToggles);
+
+    const custom = (config.custom as Record<string, unknown>) || {};
+    setCustomFolders(Array.isArray(custom.add_folders) ? (custom.add_folders as string[]).join(', ') : '');
+    const addFiles = Array.isArray(custom.add_files) ? (custom.add_files as CustomFileEntry[]) : [];
+    setCustomFileEntries(addFiles.length > 0 ? addFiles : [{ path: '', content: '' }]);
+    setRemoveFolders(Array.isArray(custom.remove_folders) ? (custom.remove_folders as string[]).join(', ') : '');
+    setRemoveFiles(Array.isArray(custom.remove_files) ? (custom.remove_files as string[]).join(', ') : '');
+
+    const root = (config.root as Record<string, unknown>) || {};
+    setRootMode((root.mode as string) || 'new');
+    setRootName((root.name as string) || 'my-stacksprint-app');
+    setRootPath((root.path as string) || '.');
+    setModuleName((root.module as string) || 'github.com/example/my-stacksprint-app');
+  }
+
+  function loadPreset(name: string) {
+    const match = presets.find((p) => p.name === name);
+    if (!match) return;
+    applyPreset(match.config);
+  }
+
+  function deletePreset(name: string) {
+    persistPresets(presets.filter((p) => p.name !== name));
+  }
+
   return (
     <main className="app-shell">
       <header className="hero">
@@ -214,6 +291,29 @@ export default function Page() {
 
       <div className="layout">
         <section className="panel">
+          <article className="section section-animated">
+            <div className="section-head">
+              <h2>Preset Library</h2>
+              <span className="hint">Save and reuse stack configurations</span>
+            </div>
+            <div className="row">
+              <input value={presetName} onChange={(e) => setPresetName(e.target.value)} placeholder="Preset name (e.g. go-clean-pg)" />
+              <button type="button" className="ghost" onClick={savePreset}>Save Preset</button>
+            </div>
+            <div className="preset-list">
+              {presets.length === 0 && <div className="hint">No presets saved yet.</div>}
+              {presets.map((preset) => (
+                <div key={preset.name} className="preset-item">
+                  <span>{preset.name}</span>
+                  <div className="preset-actions">
+                    <button type="button" className="ghost" onClick={() => loadPreset(preset.name)}>Load</button>
+                    <button type="button" className="ghost" onClick={() => deletePreset(preset.name)}>Delete</button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </article>
+
           <article className="section section-animated">
             <div className="section-head">
               <h2>1. Language and Architecture</h2>
@@ -442,6 +542,12 @@ export default function Page() {
             </div>
             <p className="hint">After running your script, execute `docker compose up --build` in the generated project.</p>
             <div className="preview-status">{previewLoading ? 'Updating live preview...' : 'Live preview synced'}</div>
+            {warnings.length > 0 && (
+              <div className="warning-box">
+                <strong>Configuration Warnings</strong>
+                {warnings.map((warning) => <div key={warning} className="warning-item">- {warning}</div>)}
+              </div>
+            )}
             <div className="download-row">
               <button className="primary" disabled={!bashScript} onClick={() => download('stacksprint-init.sh', bashScript)}>Download Bash</button>
               <button className="ghost" disabled={!powerShellScript} onClick={() => download('stacksprint-init.ps1', powerShellScript)}>Download PowerShell</button>
@@ -454,7 +560,7 @@ export default function Page() {
                 const isDir = !item.includes('.');
                 return (
                   <div key={item} className="file-tree-row" style={{ paddingLeft: `${depth * 14 + 8}px` }}>
-                    <span className="file-tree-icon">{isDir ? '▸' : '•'}</span>
+                    <span className="file-tree-icon">{isDir ? 'd' : 'f'}</span>
                     <span>{item}</span>
                   </div>
                 );

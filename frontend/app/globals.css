@@ -226,6 +226,28 @@ textarea {
   margin-bottom: 10px;
 }
 
+.preset-list {
+  margin-top: 10px;
+  display: grid;
+  gap: 8px;
+}
+
+.preset-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 8px 10px;
+  background: #fbfdff;
+}
+
+.preset-actions {
+  display: flex;
+  gap: 8px;
+}
+
 .file-item {
   border: 1px solid var(--line);
   border-radius: 10px;
@@ -252,6 +274,20 @@ textarea {
   font-size: .82rem;
   color: #2a4f93;
   margin-bottom: 10px;
+}
+
+.warning-box {
+  border: 1px solid #f1d08f;
+  background: #fff8e6;
+  color: #7a4c00;
+  border-radius: 10px;
+  padding: 10px;
+  margin-bottom: 10px;
+  font-size: 0.83rem;
+}
+
+.warning-item {
+  margin-top: 4px;
 }
 
 .file-tree {
