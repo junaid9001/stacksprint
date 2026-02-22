@@ -1,0 +1,13 @@
+{{if eq .Framework "django"}}# Django entrypoint is generated via manage.py and config/*.py
+{{else}}from fastapi import FastAPI
+
+app = FastAPI(title='StackSprint')
+
+@app.get('/health')
+def health():
+    return {'status': 'ok', 'architecture': '{{.Architecture}}'}
+
+@app.get('/api/v1/items')
+def list_items():
+    return [{'id': 1, 'name': 'sample'}]
+{{end}}

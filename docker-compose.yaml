@@ -1,0 +1,21 @@
+services:
+  backend:
+    build: ./backend
+    container_name: stacksprint-backend
+    environment:
+      - PORT=8080
+      - TEMPLATE_ROOT=/templates
+    volumes:
+      - ./templates:/templates:ro
+    ports:
+      - "8080:8080"
+
+  frontend:
+    build: ./frontend
+    container_name: stacksprint-frontend
+    environment:
+      - NEXT_PUBLIC_API_URL=http://localhost:8080
+    ports:
+      - "3000:3000"
+    depends_on:
+      - backend
