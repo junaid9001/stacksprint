@@ -97,8 +97,8 @@ func (e *Engine) generateCore(tree *FileTree, req GenerateRequest) error {
 		addFile(tree, "docs/openapi.yaml", buildOpenAPI(req))
 	}
 	if req.Database != "none" {
-		addFile(tree, "migrations/001_initial.sql", sampleMigration(req.Database))
-		addFile(tree, "db/init/001_init.sql", sampleDBInit(req.Database))
+		addFile(tree, "migrations/001_initial.sql", sampleMigration(req.Database, req.Custom.Models))
+		addFile(tree, "db/init/001_init.sql", sampleDBInit(req.Database, req.Custom.Models))
 	}
 	if strings.EqualFold(req.ServiceCommunication, "grpc") {
 		addFile(tree, "proto/README.md", "# Shared proto definitions\n\nPlace your protobuf contracts here.\n")

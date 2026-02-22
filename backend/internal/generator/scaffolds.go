@@ -1,8 +1,10 @@
 package generator
 
 import (
+	"bytes"
 	"fmt"
 	"strings"
+	"text/template"
 )
 
 func goMod(framework string, root RootOptions) string {
@@ -372,18 +374,87 @@ func composeDBServiceName(db string) string {
 	return "db"
 }
 
-func sampleMigration(db string) string {
+func sampleMigration(db string, models []DataModel) string {
 	if db == "mongodb" {
 		return "// MongoDB migrations are usually handled by migration tools at runtime.\n"
 	}
-	return "CREATE TABLE IF NOT EXISTS items (\n  id SERIAL PRIMARY KEY,\n  name VARCHAR(255) NOT NULL\n);\n"
+	return renderSQLTablesTemplate(models, false)
 }
 
-func sampleDBInit(db string) string {
+func sampleDBInit(db string, models []DataModel) string {
 	if db == "mongodb" {
 		return "db = db.getSiblingDB('app');\ndb.createCollection('items');\n"
 	}
-	return "CREATE TABLE IF NOT EXISTS items (\n  id SERIAL PRIMARY KEY,\n  name VARCHAR(255) NOT NULL\n);\nINSERT INTO items (name) VALUES ('seed-item');\n"
+	return renderSQLTablesTemplate(models, true)
+}
+
+func renderSQLTablesTemplate(models []DataModel, withSeed bool) string {
+	const tpl = `{{ range .Models -}}
+CREATE TABLE IF NOT EXISTS {{ .TableName }} (
+  id SERIAL PRIMARY KEY{{ range .Columns }},
+  {{ .Name }} {{ .SQLType }}{{ end }}
+);
+{{ if $.WithSeed }}INSERT INTO {{ .TableName }} DEFAULT VALUES;
+{{ end }}
+
+{{ end -}}`
+
+	type sqlColumn struct {
+		Name    string
+		SQLType string
+	}
+	type sqlTable struct {
+		TableName string
+		Columns   []sqlColumn
+	}
+	type sqlPayload struct {
+		WithSeed bool
+		Models   []sqlTable
+	}
+
+	resolved := resolvedModels(models)
+	tables := make([]sqlTable, 0, len(resolved))
+	for _, model := range resolved {
+		table := sqlTable{
+			TableName: strings.ToLower(model.Name) + "s",
+			Columns:   make([]sqlColumn, 0, len(model.Fields)),
+		}
+		for _, field := range model.Fields {
+			if strings.EqualFold(field.Name, "id") {
+				continue
+			}
+			table.Columns = append(table.Columns, sqlColumn{
+				Name:    strings.ToLower(field.Name),
+				SQLType: sqlTypeFromField(field.Type),
+			})
+		}
+		tables = append(tables, table)
+	}
+
+	t, err := template.New("sql-migrations").Parse(tpl)
+	if err != nil {
+		return ""
+	}
+	var b bytes.Buffer
+	if err := t.Execute(&b, sqlPayload{WithSeed: withSeed, Models: tables}); err != nil {
+		return ""
+	}
+	return b.String()
+}
+
+func sqlTypeFromField(v string) string {
+	switch strings.ToLower(strings.TrimSpace(v)) {
+	case "int", "integer":
+		return "INT"
+	case "float", "float64", "double", "decimal":
+		return "DECIMAL(10,2)"
+	case "bool", "boolean":
+		return "BOOLEAN"
+	case "datetime", "timestamp", "time":
+		return "TIMESTAMP"
+	default:
+		return "VARCHAR(255)"
+	}
 }
 
 func buildREADME(req GenerateRequest) string {

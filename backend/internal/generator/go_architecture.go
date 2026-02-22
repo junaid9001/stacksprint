@@ -28,6 +28,13 @@ func (e *Engine) generateGoMonolith(tree *FileTree, req GenerateRequest) error {
 	if err := e.renderSpecs(tree, specs, data, ""); err != nil {
 		return err
 	}
+	if req.Architecture == "clean" && isEnabled(req.FileToggles.ExampleCRUD) {
+		for _, model := range resolvedModels(req.Custom.Models) {
+			if err := e.renderGoCleanDynamicModel(tree, data, model); err != nil {
+				return err
+			}
+		}
+	}
 	addFile(tree, "go.mod", goModV2(req.Framework, req.Root, req.Database, req.UseORM, strings.EqualFold(req.ServiceCommunication, "grpc")))
 	if isEnabled(req.FileToggles.Config) {
 		addFile(tree, "internal/config/config.go", goConfigLoader())
@@ -91,12 +98,7 @@ func goMonolithTemplateSpecs(req GenerateRequest) []templateSpec {
 			{Template: "go/clean/cmd/server/main.tmpl", Output: "cmd/server/main.go"},
 		}
 		if withCRUD {
-			return append(base, []templateSpec{
-				{Template: "go/clean/internal/domain/item.tmpl", Output: "internal/domain/item.go"},
-				{Template: "go/clean/internal/usecase/item_usecase.tmpl", Output: "internal/usecase/item_usecase.go"},
-				{Template: "go/clean/internal/delivery/http/item_handler.tmpl", Output: "internal/delivery/http/item_handler.go"},
-				{Template: "go/clean/internal/repository/item_repository.tmpl", Output: "internal/repository/item_repository.go"},
-			}...)
+			return base
 		}
 		return append(base, []templateSpec{
 			{Template: "go/clean/internal/domain/ping.tmpl", Output: "internal/domain/ping.go"},
@@ -155,4 +157,50 @@ func goMicroserviceTemplateSpecs(req GenerateRequest) []templateSpec {
 
 func isSQLDB(db string) bool {
 	return db == "postgresql" || db == "mysql"
+}
+
+func (e *Engine) renderGoCleanDynamicModel(tree *FileTree, baseData map[string]any, model DataModel) error {
+	modelNameLower := strings.ToLower(model.Name)
+	specs := []templateSpec{
+		{Template: "go/clean/internal/domain/dynamic.tmpl", Output: "internal/domain/" + modelNameLower + ".go"},
+		{Template: "go/clean/internal/usecase/dynamic.tmpl", Output: "internal/usecase/" + modelNameLower + "_usecase.go"},
+		{Template: "go/clean/internal/repository/dynamic.tmpl", Output: "internal/repository/" + modelNameLower + "_repository.go"},
+		{Template: "go/clean/internal/delivery/http/dynamic.tmpl", Output: "internal/delivery/http/" + modelNameLower + "_handler.go"},
+	}
+
+	type goTemplateField struct {
+		Name     string
+		Type     string
+		JSONName string
+	}
+	type goTemplateModel struct {
+		Name   string
+		Fields []goTemplateField
+	}
+	templModel := goTemplateModel{Name: model.Name, Fields: make([]goTemplateField, 0, len(model.Fields))}
+	for _, field := range model.Fields {
+		if strings.EqualFold(field.Name, "id") {
+			continue
+		}
+		templModel.Fields = append(templModel.Fields, goTemplateField{
+			Name:     toPascal(field.Name),
+			Type:     goType(field.Type),
+			JSONName: strings.ToLower(field.Name),
+		})
+	}
+
+	for _, spec := range specs {
+		data := make(map[string]any, len(baseData)+1)
+		for k, v := range baseData {
+			data[k] = v
+		}
+		data["Model"] = templModel
+
+		body, err := e.registry.Render(spec.Template, data)
+		if err != nil {
+			return err
+		}
+		addFile(tree, spec.Output, body)
+	}
+	return nil
 }
