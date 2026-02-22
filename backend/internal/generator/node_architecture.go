@@ -7,6 +7,7 @@ import (
 
 func (e *Engine) generateNodeMonolith(tree *FileTree, req GenerateRequest) error {
 	specs := nodeMonolithTemplateSpecs(req)
+	withCRUD := isEnabled(req.FileToggles.ExampleCRUD)
 	data := map[string]any{
 		"Framework":    req.Framework,
 		"Architecture": req.Architecture,
@@ -16,6 +17,7 @@ func (e *Engine) generateNodeMonolith(tree *FileTree, req GenerateRequest) error
 		"UseORM":       req.UseORM,
 		"DBKind":       req.Database,
 		"Service":      "app",
+		"WithCRUD":     withCRUD,
 	}
 	if err := e.renderSpecs(tree, specs, data, ""); err != nil {
 		return err

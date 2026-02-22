@@ -1,6 +1,6 @@
 {{if eq .Framework "django"}}# Django API entrypoint is managed by manage.py + config urls.
 {{else}}from fastapi import FastAPI
-from app.adapters.primary.http.item_controller import item_router
+{{if .WithCRUD}}from app.adapters.primary.http.item_controller import item_router{{else}}from app.adapters.primary.http.ping_controller import ping_router{{end}}
 
 app = FastAPI(title='StackSprint Hexagonal')
 
@@ -8,5 +8,5 @@ app = FastAPI(title='StackSprint Hexagonal')
 def health():
     return {'status': 'ok', 'architecture': 'hexagonal'}
 
-app.include_router(item_router)
+{{if .WithCRUD}}app.include_router(item_router){{else}}app.include_router(ping_router){{end}}
 {{end}}

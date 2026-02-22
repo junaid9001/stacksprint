@@ -1,0 +1,75 @@
+{
+  "bash_script": "#!/usr/bin/env bash\nset -euo pipefail\n\nROOT_DIR=\"golden-py-ms\"\nmkdir -p \"$ROOT_DIR\"\ncd \"$ROOT_DIR\"\n\ngit init\nmkdir -p \"db\"\nmkdir -p \"db/init\"\nmkdir -p \"migrations\"\nmkdir -p \"services\"\nmkdir -p \"services/orders\"\nmkdir -p \"services/orders/app\"\nmkdir -p \"services/users\"\nmkdir -p \"services/users/app\"\n\ncat \u003e \".gitignore\" \u003c\u003c'EOF_STACKSPRINT_GEN_9942'\n# StackSprint\n.env\n*.log\n.DS_Store\n__pycache__/\n.venv/\nEOF_STACKSPRINT_GEN_9942\n\ncat \u003e \"README.md\" \u003c\u003c'EOF_STACKSPRINT_GEN_9942'\n# StackSprint Generated Project\n\nLanguage: python\nFramework: fastapi\nArchitecture: microservices\nDatabase: mongodb\n\n## Run\n\n```bash\ndocker compose up --build\n```\nEOF_STACKSPRINT_GEN_9942\n\ncat \u003e \"db/init/001_init.sql\" \u003c\u003c'EOF_STACKSPRINT_GEN_9942'\ndb = db.getSiblingDB('app');\ndb.createCollection('items');\nEOF_STACKSPRINT_GEN_9942\n\ncat \u003e \"docker-compose.yaml\" \u003c\u003c'EOF_STACKSPRINT_GEN_9942'\nservices:\n  users:\n    build: ./services/users\n    ports:\n      - \"9001:9001\"\n    env_file:\n      - ./services/users/.env\n    depends_on:\n      mongo:\n        condition: service_healthy\n  orders:\n    build: ./services/orders\n    ports:\n      - \"9002:9002\"\n    env_file:\n      - ./services/orders/.env\n    depends_on:\n      mongo:\n        condition: service_healthy\n  mongo:\n    image: mongo:8\n    ports:\n      - \"27017:27017\"\n    healthcheck:\n      test: [\"CMD-SHELL\", \"mongosh --quiet --eval 'db.adminCommand({ ping: 1 })'\"]\n      interval: 5s\n      timeout: 5s\n      retries: 12\nEOF_STACKSPRINT_GEN_9942\n\ncat \u003e \"migrations/001_initial.sql\" \u003c\u003c'EOF_STACKSPRINT_GEN_9942'\n// MongoDB migrations are usually handled by migration tools at runtime.\nEOF_STACKSPRINT_GEN_9942\n\ncat \u003e \"services/orders/.env\" \u003c\u003c'EOF_STACKSPRINT_GEN_9942'\nPORT=9002\nDATABASE_URL=mongodb://mongo:27017/app\nEOF_STACKSPRINT_GEN_9942\n\ncat \u003e \"services/orders/Dockerfile\" \u003c\u003c'EOF_STACKSPRINT_GEN_9942'\nFROM python:3.12-slim\nWORKDIR /app\nCOPY requirements.txt .\nRUN pip install --no-cache-dir -r requirements.txt\nCOPY . .\nEXPOSE 8080\nCMD [\"uvicorn\", \"app.main:app\", \"--host\", \"0.0.0.0\", \"--port\", \"8080\"]\nEOF_STACKSPRINT_GEN_9942\n\ncat \u003e \"services/orders/app/db.py\" \u003c\u003c'EOF_STACKSPRINT_GEN_9942'\nimport os\n\nDATABASE_URL = os.getenv('DATABASE_URL', '')\nEOF_STACKSPRINT_GEN_9942\n\ncat \u003e \"services/orders/app/health.py\" \u003c\u003c'EOF_STACKSPRINT_GEN_9942'\ndef health():\n    return {\"status\": \"ok\"}\nEOF_STACKSPRINT_GEN_9942\n\ncat \u003e \"services/orders/app/items.py\" \u003c\u003c'EOF_STACKSPRINT_GEN_9942'\nfrom fastapi import APIRouter\n\nrouter = APIRouter(prefix='/items')\n\n@router.get('')\ndef list_items():\n    return [{\"id\": 1, \"name\": \"sample\"}]\nEOF_STACKSPRINT_GEN_9942\n\ncat \u003e \"services/orders/app/main.py\" \u003c\u003c'EOF_STACKSPRINT_GEN_9942'\nfrom fastapi import FastAPI\n\napp = FastAPI(title='StackSprint')\n\n@app.get('/health')\ndef health():\n    return {'status': 'ok', 'architecture': 'microservices'}\n\n@app.get('/api/v1/items')\ndef list_items():\n    return [{'id': 1, 'name': 'sample'}]\nEOF_STACKSPRINT_GEN_9942\n\ncat \u003e \"services/orders/app/models.py\" \u003c\u003c'EOF_STACKSPRINT_GEN_9942'\nfrom pydantic import BaseModel\n\nclass Item(BaseModel):\n    id: int\n    name: str\nEOF_STACKSPRINT_GEN_9942\n\ncat \u003e \"services/orders/app/routes.py\" \u003c\u003c'EOF_STACKSPRINT_GEN_9942'\nBASE_PATH = '/api/v1'\nEOF_STACKSPRINT_GEN_9942\n\ncat \u003e \"services/orders/requirements.txt\" \u003c\u003c'EOF_STACKSPRINT_GEN_9942'\nfastapi==0.116.0\nuvicorn==0.34.0\nEOF_STACKSPRINT_GEN_9942\n\ncat \u003e \"services/users/.env\" \u003c\u003c'EOF_STACKSPRINT_GEN_9942'\nPORT=9001\nDATABASE_URL=mongodb://mongo:27017/app\nEOF_STACKSPRINT_GEN_9942\n\ncat \u003e \"services/users/Dockerfile\" \u003c\u003c'EOF_STACKSPRINT_GEN_9942'\nFROM python:3.12-slim\nWORKDIR /app\nCOPY requirements.txt .\nRUN pip install --no-cache-dir -r requirements.txt\nCOPY . .\nEXPOSE 8080\nCMD [\"uvicorn\", \"app.main:app\", \"--host\", \"0.0.0.0\", \"--port\", \"8080\"]\nEOF_STACKSPRINT_GEN_9942\n\ncat \u003e \"services/users/app/db.py\" \u003c\u003c'EOF_STACKSPRINT_GEN_9942'\nimport os\n\nDATABASE_URL = os.getenv('DATABASE_URL', '')\nEOF_STACKSPRINT_GEN_9942\n\ncat \u003e \"services/users/app/health.py\" \u003c\u003c'EOF_STACKSPRINT_GEN_9942'\ndef health():\n    return {\"status\": \"ok\"}\nEOF_STACKSPRINT_GEN_9942\n\ncat \u003e \"services/users/app/items.py\" \u003c\u003c'EOF_STACKSPRINT_GEN_9942'\nfrom fastapi import APIRouter\n\nrouter = APIRouter(prefix='/items')\n\n@router.get('')\ndef list_items():\n    return [{\"id\": 1, \"name\": \"sample\"}]\nEOF_STACKSPRINT_GEN_9942\n\ncat \u003e \"services/users/app/main.py\" \u003c\u003c'EOF_STACKSPRINT_GEN_9942'\nfrom fastapi import FastAPI\n\napp = FastAPI(title='StackSprint')\n\n@app.get('/health')\ndef health():\n    return {'status': 'ok', 'architecture': 'microservices'}\n\n@app.get('/api/v1/items')\ndef list_items():\n    return [{'id': 1, 'name': 'sample'}]\nEOF_STACKSPRINT_GEN_9942\n\ncat \u003e \"services/users/app/models.py\" \u003c\u003c'EOF_STACKSPRINT_GEN_9942'\nfrom pydantic import BaseModel\n\nclass Item(BaseModel):\n    id: int\n    name: str\nEOF_STACKSPRINT_GEN_9942\n\ncat \u003e \"services/users/app/routes.py\" \u003c\u003c'EOF_STACKSPRINT_GEN_9942'\nBASE_PATH = '/api/v1'\nEOF_STACKSPRINT_GEN_9942\n\ncat \u003e \"services/users/requirements.txt\" \u003c\u003c'EOF_STACKSPRINT_GEN_9942'\nfastapi==0.116.0\nuvicorn==0.34.0\nEOF_STACKSPRINT_GEN_9942\n\necho \"StackSprint project generated successfully.\"\necho \"Run: docker compose up --build\"\n",
+  "powershell_script": "$ErrorActionPreference = 'Stop'\n\n$RootDir = 'golden-py-ms'\nNew-Item -ItemType Directory -Path $RootDir -Force | Out-Null\nSet-Location $RootDir\n\ngit init\nNew-Item -ItemType Directory -Path 'db' -Force | Out-Null\nNew-Item -ItemType Directory -Path 'db/init' -Force | Out-Null\nNew-Item -ItemType Directory -Path 'migrations' -Force | Out-Null\nNew-Item -ItemType Directory -Path 'services' -Force | Out-Null\nNew-Item -ItemType Directory -Path 'services/orders' -Force | Out-Null\nNew-Item -ItemType Directory -Path 'services/orders/app' -Force | Out-Null\nNew-Item -ItemType Directory -Path 'services/users' -Force | Out-Null\nNew-Item -ItemType Directory -Path 'services/users/app' -Force | Out-Null\n\n@'\n# StackSprint\n.env\n*.log\n.DS_Store\n__pycache__/\n.venv/\n'@ | Set-Content -NoNewline '.gitignore'\n\n@'\n# StackSprint Generated Project\n\nLanguage: python\nFramework: fastapi\nArchitecture: microservices\nDatabase: mongodb\n\n## Run\n\n```bash\ndocker compose up --build\n```\n'@ | Set-Content -NoNewline 'README.md'\n\n@'\ndb = db.getSiblingDB('app');\ndb.createCollection('items');\n'@ | Set-Content -NoNewline 'db/init/001_init.sql'\n\n@'\nservices:\n  users:\n    build: ./services/users\n    ports:\n      - \"9001:9001\"\n    env_file:\n      - ./services/users/.env\n    depends_on:\n      mongo:\n        condition: service_healthy\n  orders:\n    build: ./services/orders\n    ports:\n      - \"9002:9002\"\n    env_file:\n      - ./services/orders/.env\n    depends_on:\n      mongo:\n        condition: service_healthy\n  mongo:\n    image: mongo:8\n    ports:\n      - \"27017:27017\"\n    healthcheck:\n      test: [\"CMD-SHELL\", \"mongosh --quiet --eval 'db.adminCommand({ ping: 1 })'\"]\n      interval: 5s\n      timeout: 5s\n      retries: 12\n'@ | Set-Content -NoNewline 'docker-compose.yaml'\n\n@'\n// MongoDB migrations are usually handled by migration tools at runtime.\n'@ | Set-Content -NoNewline 'migrations/001_initial.sql'\n\n@'\nPORT=9002\nDATABASE_URL=mongodb://mongo:27017/app\n'@ | Set-Content -NoNewline 'services/orders/.env'\n\n@'\nFROM python:3.12-slim\nWORKDIR /app\nCOPY requirements.txt .\nRUN pip install --no-cache-dir -r requirements.txt\nCOPY . .\nEXPOSE 8080\nCMD [\"uvicorn\", \"app.main:app\", \"--host\", \"0.0.0.0\", \"--port\", \"8080\"]\n'@ | Set-Content -NoNewline 'services/orders/Dockerfile'\n\n@'\nimport os\n\nDATABASE_URL = os.getenv('DATABASE_URL', '')\n'@ | Set-Content -NoNewline 'services/orders/app/db.py'\n\n@'\ndef health():\n    return {\"status\": \"ok\"}\n'@ | Set-Content -NoNewline 'services/orders/app/health.py'\n\n@'\nfrom fastapi import APIRouter\n\nrouter = APIRouter(prefix='/items')\n\n@router.get('')\ndef list_items():\n    return [{\"id\": 1, \"name\": \"sample\"}]\n'@ | Set-Content -NoNewline 'services/orders/app/items.py'\n\n@'\nfrom fastapi import FastAPI\n\napp = FastAPI(title='StackSprint')\n\n@app.get('/health')\ndef health():\n    return {'status': 'ok', 'architecture': 'microservices'}\n\n@app.get('/api/v1/items')\ndef list_items():\n    return [{'id': 1, 'name': 'sample'}]\n'@ | Set-Content -NoNewline 'services/orders/app/main.py'\n\n@'\nfrom pydantic import BaseModel\n\nclass Item(BaseModel):\n    id: int\n    name: str\n'@ | Set-Content -NoNewline 'services/orders/app/models.py'\n\n@'\nBASE_PATH = '/api/v1'\n'@ | Set-Content -NoNewline 'services/orders/app/routes.py'\n\n@'\nfastapi==0.116.0\nuvicorn==0.34.0\n'@ | Set-Content -NoNewline 'services/orders/requirements.txt'\n\n@'\nPORT=9001\nDATABASE_URL=mongodb://mongo:27017/app\n'@ | Set-Content -NoNewline 'services/users/.env'\n\n@'\nFROM python:3.12-slim\nWORKDIR /app\nCOPY requirements.txt .\nRUN pip install --no-cache-dir -r requirements.txt\nCOPY . .\nEXPOSE 8080\nCMD [\"uvicorn\", \"app.main:app\", \"--host\", \"0.0.0.0\", \"--port\", \"8080\"]\n'@ | Set-Content -NoNewline 'services/users/Dockerfile'\n\n@'\nimport os\n\nDATABASE_URL = os.getenv('DATABASE_URL', '')\n'@ | Set-Content -NoNewline 'services/users/app/db.py'\n\n@'\ndef health():\n    return {\"status\": \"ok\"}\n'@ | Set-Content -NoNewline 'services/users/app/health.py'\n\n@'\nfrom fastapi import APIRouter\n\nrouter = APIRouter(prefix='/items')\n\n@router.get('')\ndef list_items():\n    return [{\"id\": 1, \"name\": \"sample\"}]\n'@ | Set-Content -NoNewline 'services/users/app/items.py'\n\n@'\nfrom fastapi import FastAPI\n\napp = FastAPI(title='StackSprint')\n\n@app.get('/health')\ndef health():\n    return {'status': 'ok', 'architecture': 'microservices'}\n\n@app.get('/api/v1/items')\ndef list_items():\n    return [{'id': 1, 'name': 'sample'}]\n'@ | Set-Content -NoNewline 'services/users/app/main.py'\n\n@'\nfrom pydantic import BaseModel\n\nclass Item(BaseModel):\n    id: int\n    name: str\n'@ | Set-Content -NoNewline 'services/users/app/models.py'\n\n@'\nBASE_PATH = '/api/v1'\n'@ | Set-Content -NoNewline 'services/users/app/routes.py'\n\n@'\nfastapi==0.116.0\nuvicorn==0.34.0\n'@ | Set-Content -NoNewline 'services/users/requirements.txt'\n\nWrite-Host 'StackSprint project generated successfully.'\nWrite-Host 'Run: docker compose up --build'\n",
+  "file_paths": [
+    ".gitignore",
+    "README.md",
+    "db",
+    "db/init",
+    "db/init/001_init.sql",
+    "docker-compose.yaml",
+    "migrations",
+    "migrations/001_initial.sql",
+    "services",
+    "services/orders",
+    "services/orders/.env",
+    "services/orders/Dockerfile",
+    "services/orders/app",
+    "services/orders/app/db.py",
+    "services/orders/app/health.py",
+    "services/orders/app/items.py",
+    "services/orders/app/main.py",
+    "services/orders/app/models.py",
+    "services/orders/app/routes.py",
+    "services/orders/requirements.txt",
+    "services/users",
+    "services/users/.env",
+    "services/users/Dockerfile",
+    "services/users/app",
+    "services/users/app/db.py",
+    "services/users/app/health.py",
+    "services/users/app/items.py",
+    "services/users/app/main.py",
+    "services/users/app/models.py",
+    "services/users/app/routes.py",
+    "services/users/requirements.txt"
+  ],
+  "warnings": [],
+  "decisions": [
+    {
+      "code": "stack.core",
+      "category": "stack",
+      "message": "Language=python, Framework=fastapi, Architecture=microservices."
+    },
+    {
+      "code": "arch.microservices",
+      "category": "architecture",
+      "message": "Generated 2 services with http communication."
+    },
+    {
+      "code": "db.selected",
+      "category": "database",
+      "message": "Database=mongodb with ORM disabled."
+    },
+    {
+      "code": "output.compose",
+      "category": "output",
+      "message": "docker-compose.yaml included."
+    },
+    {
+      "code": "output.dockerfile",
+      "category": "output",
+      "message": "Dockerfile boilerplate included."
+    },
+    {
+      "code": "output.readme",
+      "category": "output",
+      "message": "README.md included."
+    },
+    {
+      "code": "output.tree",
+      "category": "output",
+      "message": "Generated 23 files and 8 directories."
+    }
+  ]
+}

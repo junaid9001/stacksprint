@@ -480,7 +480,7 @@ func addDjangoFiles(tree *FileTree, req GenerateRequest, main string) {
 	_ = main
 	addFile(tree, "manage.py", "#!/usr/bin/env python\nimport os\nimport sys\n\nif __name__ == '__main__':\n    os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'config.settings')\n    from django.core.management import execute_from_command_line\n    execute_from_command_line(sys.argv)\n")
 	addFile(tree, "config/__init__.py", "")
-	addFile(tree, "config/settings.py", djangoSettings(req.Database != "none"))
+	addFile(tree, "config/settings.py", djangoSettings(req.Database))
 	addFile(tree, "config/urls.py", "from django.urls import include, path\n\nurlpatterns = [path('api/', include('api.urls')),]\n")
 	addFile(tree, "config/wsgi.py", "import os\nfrom django.core.wsgi import get_wsgi_application\nos.environ.setdefault('DJANGO_SETTINGS_MODULE', 'config.settings')\napplication = get_wsgi_application()\n")
 	addFile(tree, "api/__init__.py", "")
@@ -494,7 +494,7 @@ func addDjangoFilesAtRoot(tree *FileTree, req GenerateRequest, main string, root
 	_ = main
 	addFile(tree, root+"/manage.py", "#!/usr/bin/env python\nimport os\nimport sys\n\nif __name__ == '__main__':\n    os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'config.settings')\n    from django.core.management import execute_from_command_line\n    execute_from_command_line(sys.argv)\n")
 	addFile(tree, root+"/config/__init__.py", "")
-	addFile(tree, root+"/config/settings.py", djangoSettings(req.Database != "none"))
+	addFile(tree, root+"/config/settings.py", djangoSettings(req.Database))
 	addFile(tree, root+"/config/urls.py", "from django.urls import include, path\nurlpatterns = [path('api/', include('api.urls')),]\n")
 	addFile(tree, root+"/config/wsgi.py", "import os\nfrom django.core.wsgi import get_wsgi_application\nos.environ.setdefault('DJANGO_SETTINGS_MODULE', 'config.settings')\napplication = get_wsgi_application()\n")
 	addFile(tree, root+"/api/__init__.py", "")
@@ -504,10 +504,13 @@ func addDjangoFilesAtRoot(tree *FileTree, req GenerateRequest, main string, root
 	addFile(tree, root+"/requirements.txt", pythonRequirements("django", req.Database, req.UseORM))
 }
 
-func djangoSettings(withDB bool) string {
+func djangoSettings(database string) string {
 	db := "\"ENGINE\": \"django.db.backends.sqlite3\", \"NAME\": BASE_DIR / \"db.sqlite3\""
-	if withDB {
+	switch database {
+	case "postgresql":
 		db = "\"ENGINE\": \"django.db.backends.postgresql\", \"NAME\": \"app\", \"USER\": \"app\", \"PASSWORD\": \"app\", \"HOST\": \"postgres\", \"PORT\": \"5432\""
+	case "mysql":
+		db = "\"ENGINE\": \"django.db.backends.mysql\", \"NAME\": \"app\", \"USER\": \"app\", \"PASSWORD\": \"app\", \"HOST\": \"mysql\", \"PORT\": \"3306\""
 	}
 	return fmt.Sprintf("from pathlib import Path\n\nBASE_DIR = Path(__file__).resolve().parent.parent\nSECRET_KEY = 'dev'\nDEBUG = True\nALLOWED_HOSTS = ['*']\nINSTALLED_APPS = ['django.contrib.contenttypes', 'django.contrib.auth', 'rest_framework', 'api']\nMIDDLEWARE = []\nROOT_URLCONF = 'config.urls'\nTEMPLATES = []\nWSGI_APPLICATION = 'config.wsgi.application'\nDATABASES = {'default': {%s}}\nLANGUAGE_CODE = 'en-us'\nTIME_ZONE = 'UTC'\nUSE_I18N = True\nUSE_TZ = True\n", db)
 }

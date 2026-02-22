@@ -8,6 +8,8 @@ type CustomFileEntry = { path: string; content: string };
 type SchemaField = { name: string; type: string };
 type SchemaModel = { name: string; fields: SchemaField[] };
 type SavedPreset = { name: string; config: Record<string, unknown> };
+type DecisionEntry = { code: string; category: string; message: string };
+type ScriptKind = 'bash' | 'powershell';
 
 const PRESET_STORAGE_KEY = 'stacksprint_presets_v1';
 
@@ -77,11 +79,14 @@ export default function Page() {
   const [powerShellScript, setPowerShellScript] = useState('');
   const [filePaths, setFilePaths] = useState<string[]>([]);
   const [warnings, setWarnings] = useState<string[]>([]);
+  const [decisions, setDecisions] = useState<DecisionEntry[]>([]);
   const [presetName, setPresetName] = useState('');
   const [presets, setPresets] = useState<SavedPreset[]>([]);
   const [error, setError] = useState('');
-  const [loading, setLoading] = useState(false);
   const [previewLoading, setPreviewLoading] = useState(false);
+  const [activeStep, setActiveStep] = useState(0);
+  const [activeScript, setActiveScript] = useState<ScriptKind>('bash');
+  const [copyStatus, setCopyStatus] = useState('');
 
   const frameworkChoices = useMemo(() => {
     if (language === 'go') return ['gin', 'fiber'];
@@ -91,6 +96,17 @@ export default function Page() {
 
   function parseCsv(v: string): string[] {
     return v.split(',').map((s) => s.trim()).filter(Boolean);
+  }
+
+  function formatKeyLabel(key: string): string {
+    return key
+      .split('_')
+      .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+      .join(' ');
+  }
+
+  function formatCategoryLabel(category: string): string {
+    return category.charAt(0).toUpperCase() + category.slice(1);
   }
 
   const payload = useMemo(() => ({
@@ -115,7 +131,7 @@ export default function Page() {
       add_files: customFileEntries
         .filter((item) => item.path.trim() !== '')
         .map((item) => ({ path: item.path.trim(), content: item.content })),
-      add_service_names: services.map((s) => s.name),
+      add_service_names: architecture === 'microservices' ? services.map((s) => s.name) : [],
       remove_folders: parseCsv(removeFolders),
       remove_files: parseCsv(removeFiles)
     },
@@ -161,12 +177,10 @@ export default function Page() {
     }
   }, []);
 
-  async function fetchScripts(mode: 'manual' | 'preview', signal?: AbortSignal) {
-    if (mode === 'manual') {
-      setLoading(true);
-    } else {
-      setPreviewLoading(true);
-    }
+  const steps = ['Stack', 'Data', 'Features', 'Files', 'Root', 'Custom', 'Review'];
+
+  async function fetchScripts(signal?: AbortSignal) {
+    setPreviewLoading(true);
     setError('');
 
     try {
@@ -186,23 +200,20 @@ export default function Page() {
       setPowerShellScript(body.powershell_script || '');
       setFilePaths(Array.isArray(body.file_paths) ? body.file_paths : []);
       setWarnings(Array.isArray(body.warnings) ? body.warnings : []);
+      setDecisions(Array.isArray(body.decisions) ? body.decisions : []);
     } catch (e) {
       if ((e as Error).name !== 'AbortError') {
         setError(String(e));
       }
     } finally {
-      if (mode === 'manual') {
-        setLoading(false);
-      } else {
-        setPreviewLoading(false);
-      }
+      setPreviewLoading(false);
     }
   }
 
   useEffect(() => {
     const controller = new AbortController();
     const timer = setTimeout(() => {
-      fetchScripts('preview', controller.signal);
+      fetchScripts(controller.signal);
     }, 500);
 
     return () => {
@@ -219,6 +230,18 @@ export default function Page() {
     a.download = name;
     a.click();
     URL.revokeObjectURL(url);
+  }
+
+  async function copyToClipboard(content: string, label: string) {
+    if (!content) return;
+    try {
+      await navigator.clipboard.writeText(content);
+      setCopyStatus(`${label} copied`);
+      setTimeout(() => setCopyStatus(''), 1800);
+    } catch {
+      setCopyStatus('Copy failed');
+      setTimeout(() => setCopyStatus(''), 1800);
+    }
   }
 
   function updateCustomFile(index: number, patch: Partial<CustomFileEntry>) {
@@ -339,6 +362,21 @@ export default function Page() {
     persistPresets(presets.filter((p) => p.name !== name));
   }
 
+  const selectedInfraCount = Object.values(infra).filter(Boolean).length;
+  const selectedFeatureCount = Object.values(features).filter(Boolean).length;
+  const currentScript = activeScript === 'bash' ? bashScript : powerShellScript;
+  const currentScriptName = activeScript === 'bash' ? 'Bash' : 'PowerShell';
+  const directorySet = useMemo(() => {
+    const set = new Set<string>();
+    for (const item of filePaths) {
+      const idx = item.lastIndexOf('/');
+      if (idx > 0) {
+        set.add(item.slice(0, idx));
+      }
+    }
+    return set;
+  }, [filePaths]);
+
   return (
     <main className="app-shell">
       <header className="hero">
@@ -347,11 +385,34 @@ export default function Page() {
         <p className="subtitle">
           Design production-ready backend architecture and download one-click Bash or PowerShell setup scripts.
         </p>
+        <div className="hero-metrics">
+          <div className="metric-pill">{language.toUpperCase()}</div>
+          <div className="metric-pill">{architecture}</div>
+          <div className="metric-pill">{selectedInfraCount} Infra</div>
+          <div className="metric-pill">{selectedFeatureCount} Features</div>
+        </div>
       </header>
 
       <div className="layout">
         <section className="panel">
           <article className="section section-animated">
+            <div className="stepper">
+              {steps.map((step, index) => (
+                <button
+                  key={step}
+                  type="button"
+                  className={`step-chip ${activeStep === index ? 'active' : ''}`}
+                  onClick={() => setActiveStep(index)}
+                >
+                  <span>{index + 1}</span>
+                  {step}
+                </button>
+              ))}
+            </div>
+          </article>
+
+          {activeStep === 0 && (
+            <article className="section section-animated">
             <div className="section-head">
               <h2>Preset Library</h2>
               <span className="hint">Save and reuse stack configurations</span>
@@ -372,9 +433,11 @@ export default function Page() {
                 </div>
               ))}
             </div>
-          </article>
+            </article>
+          )}
 
-          <article className="section section-animated">
+          {activeStep === 0 && (
+            <article className="section section-animated">
             <div className="section-head">
               <h2>1. Language and Architecture</h2>
               <span className="hint">Core stack selection</span>
@@ -449,9 +512,11 @@ export default function Page() {
                 <option value="grpc">gRPC (+ shared proto)</option>
               </select>
             </div>
-          </article>
+            </article>
+          )}
 
-          <article className="section section-animated">
+          {activeStep === 1 && (
+            <article className="section section-animated">
             <div className="section-head">
               <h2>2. Database and Infra</h2>
               <span className="hint">Runtime dependencies</span>
@@ -518,9 +583,11 @@ export default function Page() {
                 </label>
               ))}
             </div>
-          </article>
+            </article>
+          )}
 
-          <article className="section section-animated">
+          {activeStep === 2 && (
+            <article className="section section-animated">
             <div className="section-head">
               <h2>3. Optional Features</h2>
               <span className="hint">Boilerplate extras</span>
@@ -537,9 +604,11 @@ export default function Page() {
                 </label>
               ))}
             </div>
-          </article>
+            </article>
+          )}
 
-          <article className="section section-animated">
+          {activeStep === 3 && (
+            <article className="section section-animated">
             <div className="section-head">
               <h2>4. File Toggles</h2>
               <span className="hint">Default generated files</span>
@@ -552,13 +621,15 @@ export default function Page() {
                     checked={v}
                     onChange={(e) => setFileToggles({ ...fileToggles, [k]: e.target.checked })}
                   />
-                  <span>{k}</span>
+                  <span>{formatKeyLabel(k)}</span>
                 </label>
               ))}
             </div>
-          </article>
+            </article>
+          )}
 
-          <article className="section section-animated">
+          {activeStep === 4 && (
+            <article className="section section-animated">
             <div className="section-head">
               <h2>5. Root Initialization</h2>
               <span className="hint">Target directory setup</span>
@@ -582,9 +653,11 @@ export default function Page() {
                 <input value={moduleName} onChange={(e) => setModuleName(e.target.value)} placeholder="go module name" />
               </div>
             )}
-          </article>
+            </article>
+          )}
 
-          <article className="section section-animated">
+          {activeStep === 5 && (
+            <article className="section section-animated">
             <div className="section-head">
               <h2>6. Custom Structure Builder</h2>
               <span className="hint">Add or remove paths dynamically</span>
@@ -621,12 +694,31 @@ export default function Page() {
               <label>Remove files (comma-separated)</label>
               <input value={removeFiles} onChange={(e) => setRemoveFiles(e.target.value)} placeholder="README.md, .env" />
             </div>
-          </article>
+            </article>
+          )}
+
+          {activeStep === 6 && (
+            <article className="section section-animated">
+              <div className="section-head">
+                <h2>7. Review</h2>
+                <span className="hint">Validate decisions before using scripts</span>
+              </div>
+              <div className="review-grid">
+                <div className="review-item"><strong>Language:</strong> {language}</div>
+                <div className="review-item"><strong>Framework:</strong> {framework}</div>
+                <div className="review-item"><strong>Architecture:</strong> {architecture}</div>
+                <div className="review-item"><strong>Database:</strong> {db}</div>
+                <div className="review-item"><strong>Infra:</strong> {selectedInfraCount}</div>
+                <div className="review-item"><strong>Features:</strong> {selectedFeatureCount}</div>
+              </div>
+            </article>
+          )}
 
           <div className="actions">
-            <button className="primary" disabled={loading} onClick={() => fetchScripts('manual')}>
-              {loading ? 'Generating...' : 'Generate Scripts'}
-            </button>
+            <div className="step-actions">
+              <button type="button" className="ghost" disabled={activeStep === 0} onClick={() => setActiveStep((s) => Math.max(0, s - 1))}>Previous</button>
+              <button type="button" className="primary" disabled={activeStep === steps.length - 1} onClick={() => setActiveStep((s) => Math.min(steps.length - 1, s + 1))}>Next</button>
+            </div>
             {error && <div className="error">{error}</div>}
           </div>
         </section>
@@ -639,22 +731,49 @@ export default function Page() {
             </div>
             <p className="hint">After running your script, execute `docker compose up --build` in the generated project.</p>
             <div className="preview-status">{previewLoading ? 'Updating live preview...' : 'Live preview synced'}</div>
+            <div className="result-stats">
+              <div className="result-stat">{filePaths.length} Paths</div>
+              <div className="result-stat">{decisions.length} Decisions</div>
+              <div className="result-stat">{warnings.length} Warnings</div>
+            </div>
             {warnings.length > 0 && (
               <div className="warning-box">
                 <strong>Configuration Warnings</strong>
                 {warnings.map((warning) => <div key={warning} className="warning-item">- {warning}</div>)}
               </div>
             )}
+            {decisions.length > 0 && (
+              <>
+                <label>Why This Was Generated</label>
+                <div className="decision-list">
+                  {decisions.map((decision) => (
+                    <div key={decision.code + decision.message} className="decision-item">
+                      <div className="decision-meta">
+                        <span className="decision-badge">{formatCategoryLabel(decision.category)}</span>
+                        <span className="decision-code">{decision.code}</span>
+                      </div>
+                      <div className="decision-message">{decision.message}</div>
+                    </div>
+                  ))}
+                </div>
+              </>
+            )}
             <div className="download-row">
-              <button className="primary" disabled={!bashScript} onClick={() => download('stacksprint-init.sh', bashScript)}>Download Bash</button>
-              <button className="ghost" disabled={!powerShellScript} onClick={() => download('stacksprint-init.ps1', powerShellScript)}>Download PowerShell</button>
+              <button className={`ghost ${activeScript === 'bash' ? 'tab-active' : ''}`} type="button" onClick={() => setActiveScript('bash')}>Bash</button>
+              <button className={`ghost ${activeScript === 'powershell' ? 'tab-active' : ''}`} type="button" onClick={() => setActiveScript('powershell')}>PowerShell</button>
             </div>
+            <div className="download-row">
+              <button className="primary" disabled={!currentScript} onClick={() => download(activeScript === 'bash' ? 'stacksprint-init.sh' : 'stacksprint-init.ps1', currentScript)}>Download {currentScriptName}</button>
+              <button className="ghost" disabled={!currentScript} onClick={() => copyToClipboard(currentScript, currentScriptName)}>Copy {currentScriptName}</button>
+              <button className="ghost" disabled={!currentScript} onClick={() => copyToClipboard(currentScript, 'Script')}>Copy Preview</button>
+            </div>
+            {copyStatus && <div className="copy-status">{copyStatus}</div>}
             <label>Project Explorer</label>
             <div className="file-tree">
               {filePaths.length === 0 && <div className="file-tree-empty">No generated paths yet.</div>}
               {filePaths.map((item) => {
                 const depth = item.split('/').filter(Boolean).length - 1;
-                const isDir = !item.includes('.');
+                const isDir = directorySet.has(item) || !item.includes('.');
                 return (
                   <div key={item} className="file-tree-row" style={{ paddingLeft: `${depth * 14 + 8}px` }}>
                     <span className="file-tree-icon">{isDir ? 'd' : 'f'}</span>
@@ -663,8 +782,8 @@ export default function Page() {
                 );
               })}
             </div>
-            <label>Script Preview</label>
-            <pre>{bashScript || '# script preview will appear here after configuration is valid'}</pre>
+            <label>{currentScriptName} Preview</label>
+            <pre>{currentScript || '# script preview will appear here after configuration is valid'}</pre>
           </article>
         </aside>
       </div>

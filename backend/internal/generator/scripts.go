@@ -9,15 +9,18 @@ import (
 
 const bashHeredocDelimiter = "EOF_STACKSPRINT_GEN_9942"
 
-func BuildScripts(req GenerateRequest, tree FileTree) (GenerateResponse, error) {
+func BuildScripts(req GenerateRequest, tree FileTree, extraWarnings []string) (GenerateResponse, error) {
 	ensureGitKeepFiles(&tree)
 	bash := buildBash(req, tree)
 	pwsh := buildPowerShell(req, tree)
+	warnings := mergeWarnings(buildGenerationWarnings(req), extraWarnings)
+	decisions := buildDecisionEntries(req, tree, extraWarnings)
 	return GenerateResponse{
 		BashScript:       bash,
 		PowerShellScript: pwsh,
 		FilePaths:        collectFilePaths(tree),
-		Warnings:         buildGenerationWarnings(req),
+		Warnings:         warnings,
+		Decisions:        decisions,
 	}, nil
 }
 

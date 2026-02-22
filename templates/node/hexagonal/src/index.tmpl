@@ -1,16 +1,19 @@
 {{if eq .Framework "express"}}import express from 'express';
-import { listItems } from './adapters/primary/http/itemController.js';
+{{if .WithCRUD}}import { listItems } from './adapters/primary/http/itemController.js';{{else}}import { pingController } from './adapters/primary/http/pingController.js';{{end}}
 
 const app = express();
 app.use(express.json());
 app.get('/health', (req, res) => res.json({ status: 'ok', architecture: 'hexagonal' }));
-app.get('/api/v1/items', listItems);
+{{if .WithCRUD}}app.get('/api/v1/items', listItems);{{else}}app.get('/ping', pingController);{{end}}
 app.listen(process.env.PORT || {{.Port}}, () => console.log('listening'));
 {{else}}import Fastify from 'fastify';
-import { listItemsFastify } from './adapters/primary/http/itemController.js';
+{{if .WithCRUD}}import { listItemsFastify } from './adapters/primary/http/itemController.js';{{else}}import { PingService } from './core/services/pingService.js';{{end}}
 
 const app = Fastify({ logger: true });
 app.get('/health', async () => ({ status: 'ok', architecture: 'hexagonal' }));
-app.get('/api/v1/items', listItemsFastify);
+{{if .WithCRUD}}app.get('/api/v1/items', listItemsFastify);{{else}}
+const service = new PingService();
+app.get('/ping', async () => service.ping());
+{{end}}
 app.listen({ port: Number(process.env.PORT || {{.Port}}), host: '0.0.0.0' });
 {{end}}

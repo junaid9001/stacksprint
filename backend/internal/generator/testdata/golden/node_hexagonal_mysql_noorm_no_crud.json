@@ -1,0 +1,81 @@
+{
+  "bash_script": "#!/usr/bin/env bash\nset -euo pipefail\n\nROOT_DIR=\"golden-node-hex\"\nmkdir -p \"$ROOT_DIR\"\ncd \"$ROOT_DIR\"\n\ngit init\nnpm init -y\nmkdir -p \"db\"\nmkdir -p \"db/init\"\nmkdir -p \"migrations\"\nmkdir -p \"src\"\nmkdir -p \"src/adapters\"\nmkdir -p \"src/adapters/primary\"\nmkdir -p \"src/adapters/primary/http\"\nmkdir -p \"src/adapters/secondary\"\nmkdir -p \"src/adapters/secondary/database\"\nmkdir -p \"src/config\"\nmkdir -p \"src/core\"\nmkdir -p \"src/core/ports\"\nmkdir -p \"src/core/services\"\nmkdir -p \"src/db\"\nmkdir -p \"src/logger\"\nmkdir -p \"src/models\"\nmkdir -p \"src/routes\"\n\ncat \u003e \".env\" \u003c\u003c'EOF_STACKSPRINT_GEN_9942'\nPORT=8080\nDATABASE_URL=mysql://app:app@mysql:3306/app\nEOF_STACKSPRINT_GEN_9942\n\ncat \u003e \".gitignore\" \u003c\u003c'EOF_STACKSPRINT_GEN_9942'\n# StackSprint\n.env\n*.log\n.DS_Store\nnode_modules/\nEOF_STACKSPRINT_GEN_9942\n\ncat \u003e \"Dockerfile\" \u003c\u003c'EOF_STACKSPRINT_GEN_9942'\nFROM node:22-alpine\nWORKDIR /app\nCOPY package*.json ./\nRUN npm install\nCOPY . .\nEXPOSE 8080\nCMD [\"npm\", \"start\"]\nEOF_STACKSPRINT_GEN_9942\n\ncat \u003e \"README.md\" \u003c\u003c'EOF_STACKSPRINT_GEN_9942'\n# StackSprint Generated Project\n\nLanguage: node\nFramework: express\nArchitecture: hexagonal\nDatabase: mysql\n\n## Run\n\n```bash\ndocker compose up --build\n```\nEOF_STACKSPRINT_GEN_9942\n\ncat \u003e \"db/init/001_init.sql\" \u003c\u003c'EOF_STACKSPRINT_GEN_9942'\nCREATE TABLE IF NOT EXISTS items (\n  id SERIAL PRIMARY KEY,\n  name VARCHAR(255)\n);\nINSERT INTO items DEFAULT VALUES;\n\n\nEOF_STACKSPRINT_GEN_9942\n\ncat \u003e \"docker-compose.yaml\" \u003c\u003c'EOF_STACKSPRINT_GEN_9942'\nservices:\n  app:\n    build: .\n    ports:\n      - \"8080:8080\"\n    env_file:\n      - ./.env\n    depends_on:\n      mysql:\n        condition: service_healthy\n  mysql:\n    image: mysql:8.4\n    environment:\n      MYSQL_DATABASE: app\n      MYSQL_USER: app\n      MYSQL_PASSWORD: app\n      MYSQL_ROOT_PASSWORD: root\n    volumes:\n      - ./db/init:/docker-entrypoint-initdb.d\n    ports:\n      - \"3306:3306\"\n    healthcheck:\n      test: [\"CMD-SHELL\", \"mysqladmin ping -h localhost -uapp -papp\"]\n      interval: 5s\n      timeout: 5s\n      retries: 12\nEOF_STACKSPRINT_GEN_9942\n\ncat \u003e \"migrations/001_initial.sql\" \u003c\u003c'EOF_STACKSPRINT_GEN_9942'\nCREATE TABLE IF NOT EXISTS items (\n  id SERIAL PRIMARY KEY,\n  name VARCHAR(255)\n);\n\n\nEOF_STACKSPRINT_GEN_9942\n\ncat \u003e \"package.json\" \u003c\u003c'EOF_STACKSPRINT_GEN_9942'\n{\n  \"name\": \"stacksprint-generated\",\n  \"version\": \"1.0.0\",\n  \"private\": true,\n  \"type\": \"module\",\n  \"scripts\": {\n    \"start\": \"node src/index.js\",\n    \"dev\": \"node src/index.js\",\n    \"test\": \"node --test\"\n  },\n  \"dependencies\": {\n    \"express\": \"^5.0.0\",\n    \"mysql2\": \"^3.12.0\"\n  }\n}\nEOF_STACKSPRINT_GEN_9942\n\ncat \u003e \"src/adapters/primary/http/pingController.js\" \u003c\u003c'EOF_STACKSPRINT_GEN_9942'\nimport { PingService } from '../../../core/services/pingService.js';\n\nconst service = new PingService();\n\nexport async function pingController(req, res) {\n  res.json(service.ping());\n}\nEOF_STACKSPRINT_GEN_9942\n\ncat \u003e \"src/adapters/secondary/database/pingAdapter.js\" \u003c\u003c'EOF_STACKSPRINT_GEN_9942'\nexport class PingAdapter {\n  ping() {\n    return { status: 'ok' };\n  }\n}\nEOF_STACKSPRINT_GEN_9942\n\ncat \u003e \"src/config/index.js\" \u003c\u003c'EOF_STACKSPRINT_GEN_9942'\nexport const config = {\n  port: process.env.PORT || 8080,\n  dbUrl: process.env.DATABASE_URL || ''\n};\nEOF_STACKSPRINT_GEN_9942\n\ncat \u003e \"src/core/ports/pingPort.js\" \u003c\u003c'EOF_STACKSPRINT_GEN_9942'\nexport class PingPort {\n  ping() {\n    return { status: 'ok' };\n  }\n}\nEOF_STACKSPRINT_GEN_9942\n\ncat \u003e \"src/core/services/pingService.js\" \u003c\u003c'EOF_STACKSPRINT_GEN_9942'\nexport class PingService {\n  ping() {\n    return { status: 'ok' };\n  }\n}\nEOF_STACKSPRINT_GEN_9942\n\ncat \u003e \"src/db/connection.js\" \u003c\u003c'EOF_STACKSPRINT_GEN_9942'\nexport const databaseUrl = process.env.DATABASE_URL || '';\nEOF_STACKSPRINT_GEN_9942\n\ncat \u003e \"src/db/sqlClient.js\" \u003c\u003c'EOF_STACKSPRINT_GEN_9942'\nimport mysql from 'mysql2/promise';\n\nexport const db = await mysql.createConnection(process.env.DATABASE_URL || 'mysql://app:app@mysql:3306/app');\nEOF_STACKSPRINT_GEN_9942\n\ncat \u003e \"src/index.js\" \u003c\u003c'EOF_STACKSPRINT_GEN_9942'\nimport express from 'express';\nimport { pingController } from './adapters/primary/http/pingController.js';\n\nconst app = express();\napp.use(express.json());\napp.get('/health', (req, res) =\u003e res.json({ status: 'ok', architecture: 'hexagonal' }));\napp.get('/ping', pingController);\napp.listen(process.env.PORT || 8080, () =\u003e console.log('listening'));\n\nEOF_STACKSPRINT_GEN_9942\n\ncat \u003e \"src/logger/index.js\" \u003c\u003c'EOF_STACKSPRINT_GEN_9942'\nexport const logger = { info: (...a) =\u003e console.log('[INFO]', ...a), error: (...a) =\u003e console.error('[ERROR]', ...a) };\nEOF_STACKSPRINT_GEN_9942\n\ncat \u003e \"src/models/item.js\" \u003c\u003c'EOF_STACKSPRINT_GEN_9942'\nexport class Item {\n  constructor(id, name) { this.id = id; this.name = name; }\n}\nEOF_STACKSPRINT_GEN_9942\n\ncat \u003e \"src/routes/base.js\" \u003c\u003c'EOF_STACKSPRINT_GEN_9942'\nexport const basePath = '/api/v1';\nEOF_STACKSPRINT_GEN_9942\n\ncat \u003e \"src/routes/health.js\" \u003c\u003c'EOF_STACKSPRINT_GEN_9942'\nexport default function health(req, res) { res.send({ status: 'ok' }); }\nEOF_STACKSPRINT_GEN_9942\n\necho \"StackSprint project generated successfully.\"\necho \"Run: docker compose up --build\"\n",
+  "powershell_script": "$ErrorActionPreference = 'Stop'\n\n$RootDir = 'golden-node-hex'\nNew-Item -ItemType Directory -Path $RootDir -Force | Out-Null\nSet-Location $RootDir\n\ngit init\nnpm init -y\nNew-Item -ItemType Directory -Path 'db' -Force | Out-Null\nNew-Item -ItemType Directory -Path 'db/init' -Force | Out-Null\nNew-Item -ItemType Directory -Path 'migrations' -Force | Out-Null\nNew-Item -ItemType Directory -Path 'src' -Force | Out-Null\nNew-Item -ItemType Directory -Path 'src/adapters' -Force | Out-Null\nNew-Item -ItemType Directory -Path 'src/adapters/primary' -Force | Out-Null\nNew-Item -ItemType Directory -Path 'src/adapters/primary/http' -Force | Out-Null\nNew-Item -ItemType Directory -Path 'src/adapters/secondary' -Force | Out-Null\nNew-Item -ItemType Directory -Path 'src/adapters/secondary/database' -Force | Out-Null\nNew-Item -ItemType Directory -Path 'src/config' -Force | Out-Null\nNew-Item -ItemType Directory -Path 'src/core' -Force | Out-Null\nNew-Item -ItemType Directory -Path 'src/core/ports' -Force | Out-Null\nNew-Item -ItemType Directory -Path 'src/core/services' -Force | Out-Null\nNew-Item -ItemType Directory -Path 'src/db' -Force | Out-Null\nNew-Item -ItemType Directory -Path 'src/logger' -Force | Out-Null\nNew-Item -ItemType Directory -Path 'src/models' -Force | Out-Null\nNew-Item -ItemType Directory -Path 'src/routes' -Force | Out-Null\n\n@'\nPORT=8080\nDATABASE_URL=mysql://app:app@mysql:3306/app\n'@ | Set-Content -NoNewline '.env'\n\n@'\n# StackSprint\n.env\n*.log\n.DS_Store\nnode_modules/\n'@ | Set-Content -NoNewline '.gitignore'\n\n@'\nFROM node:22-alpine\nWORKDIR /app\nCOPY package*.json ./\nRUN npm install\nCOPY . .\nEXPOSE 8080\nCMD [\"npm\", \"start\"]\n'@ | Set-Content -NoNewline 'Dockerfile'\n\n@'\n# StackSprint Generated Project\n\nLanguage: node\nFramework: express\nArchitecture: hexagonal\nDatabase: mysql\n\n## Run\n\n```bash\ndocker compose up --build\n```\n'@ | Set-Content -NoNewline 'README.md'\n\n@'\nCREATE TABLE IF NOT EXISTS items (\n  id SERIAL PRIMARY KEY,\n  name VARCHAR(255)\n);\nINSERT INTO items DEFAULT VALUES;\n\n\n'@ | Set-Content -NoNewline 'db/init/001_init.sql'\n\n@'\nservices:\n  app:\n    build: .\n    ports:\n      - \"8080:8080\"\n    env_file:\n      - ./.env\n    depends_on:\n      mysql:\n        condition: service_healthy\n  mysql:\n    image: mysql:8.4\n    environment:\n      MYSQL_DATABASE: app\n      MYSQL_USER: app\n      MYSQL_PASSWORD: app\n      MYSQL_ROOT_PASSWORD: root\n    volumes:\n      - ./db/init:/docker-entrypoint-initdb.d\n    ports:\n      - \"3306:3306\"\n    healthcheck:\n      test: [\"CMD-SHELL\", \"mysqladmin ping -h localhost -uapp -papp\"]\n      interval: 5s\n      timeout: 5s\n      retries: 12\n'@ | Set-Content -NoNewline 'docker-compose.yaml'\n\n@'\nCREATE TABLE IF NOT EXISTS items (\n  id SERIAL PRIMARY KEY,\n  name VARCHAR(255)\n);\n\n\n'@ | Set-Content -NoNewline 'migrations/001_initial.sql'\n\n@'\n{\n  \"name\": \"stacksprint-generated\",\n  \"version\": \"1.0.0\",\n  \"private\": true,\n  \"type\": \"module\",\n  \"scripts\": {\n    \"start\": \"node src/index.js\",\n    \"dev\": \"node src/index.js\",\n    \"test\": \"node --test\"\n  },\n  \"dependencies\": {\n    \"express\": \"^5.0.0\",\n    \"mysql2\": \"^3.12.0\"\n  }\n}\n'@ | Set-Content -NoNewline 'package.json'\n\n@'\nimport { PingService } from '../../../core/services/pingService.js';\n\nconst service = new PingService();\n\nexport async function pingController(req, res) {\n  res.json(service.ping());\n}\n'@ | Set-Content -NoNewline 'src/adapters/primary/http/pingController.js'\n\n@'\nexport class PingAdapter {\n  ping() {\n    return { status: 'ok' };\n  }\n}\n'@ | Set-Content -NoNewline 'src/adapters/secondary/database/pingAdapter.js'\n\n@'\nexport const config = {\n  port: process.env.PORT || 8080,\n  dbUrl: process.env.DATABASE_URL || ''\n};\n'@ | Set-Content -NoNewline 'src/config/index.js'\n\n@'\nexport class PingPort {\n  ping() {\n    return { status: 'ok' };\n  }\n}\n'@ | Set-Content -NoNewline 'src/core/ports/pingPort.js'\n\n@'\nexport class PingService {\n  ping() {\n    return { status: 'ok' };\n  }\n}\n'@ | Set-Content -NoNewline 'src/core/services/pingService.js'\n\n@'\nexport const databaseUrl = process.env.DATABASE_URL || '';\n'@ | Set-Content -NoNewline 'src/db/connection.js'\n\n@'\nimport mysql from 'mysql2/promise';\n\nexport const db = await mysql.createConnection(process.env.DATABASE_URL || 'mysql://app:app@mysql:3306/app');\n'@ | Set-Content -NoNewline 'src/db/sqlClient.js'\n\n@'\nimport express from 'express';\nimport { pingController } from './adapters/primary/http/pingController.js';\n\nconst app = express();\napp.use(express.json());\napp.get('/health', (req, res) =\u003e res.json({ status: 'ok', architecture: 'hexagonal' }));\napp.get('/ping', pingController);\napp.listen(process.env.PORT || 8080, () =\u003e console.log('listening'));\n\n'@ | Set-Content -NoNewline 'src/index.js'\n\n@'\nexport const logger = { info: (...a) =\u003e console.log('[INFO]', ...a), error: (...a) =\u003e console.error('[ERROR]', ...a) };\n'@ | Set-Content -NoNewline 'src/logger/index.js'\n\n@'\nexport class Item {\n  constructor(id, name) { this.id = id; this.name = name; }\n}\n'@ | Set-Content -NoNewline 'src/models/item.js'\n\n@'\nexport const basePath = '/api/v1';\n'@ | Set-Content -NoNewline 'src/routes/base.js'\n\n@'\nexport default function health(req, res) { res.send({ status: 'ok' }); }\n'@ | Set-Content -NoNewline 'src/routes/health.js'\n\nWrite-Host 'StackSprint project generated successfully.'\nWrite-Host 'Run: docker compose up --build'\n",
+  "file_paths": [
+    ".env",
+    ".gitignore",
+    "Dockerfile",
+    "README.md",
+    "db",
+    "db/init",
+    "db/init/001_init.sql",
+    "docker-compose.yaml",
+    "migrations",
+    "migrations/001_initial.sql",
+    "package.json",
+    "src",
+    "src/adapters",
+    "src/adapters/primary",
+    "src/adapters/primary/http",
+    "src/adapters/primary/http/pingController.js",
+    "src/adapters/secondary",
+    "src/adapters/secondary/database",
+    "src/adapters/secondary/database/pingAdapter.js",
+    "src/config",
+    "src/config/index.js",
+    "src/core",
+    "src/core/ports",
+    "src/core/ports/pingPort.js",
+    "src/core/services",
+    "src/core/services/pingService.js",
+    "src/db",
+    "src/db/connection.js",
+    "src/db/sqlClient.js",
+    "src/index.js",
+    "src/logger",
+    "src/logger/index.js",
+    "src/models",
+    "src/models/item.js",
+    "src/routes",
+    "src/routes/base.js",
+    "src/routes/health.js"
+  ],
+  "warnings": [],
+  "decisions": [
+    {
+      "code": "stack.core",
+      "category": "stack",
+      "message": "Language=node, Framework=express, Architecture=hexagonal."
+    },
+    {
+      "code": "arch.monolith",
+      "category": "architecture",
+      "message": "Generated a single-service project structure."
+    },
+    {
+      "code": "db.selected",
+      "category": "database",
+      "message": "Database=mysql with ORM disabled."
+    },
+    {
+      "code": "output.compose",
+      "category": "output",
+      "message": "docker-compose.yaml included."
+    },
+    {
+      "code": "output.dockerfile",
+      "category": "output",
+      "message": "Dockerfile boilerplate included."
+    },
+    {
+      "code": "output.readme",
+      "category": "output",
+      "message": "README.md included."
+    },
+    {
+      "code": "output.tree",
+      "category": "output",
+      "message": "Generated 20 files and 17 directories."
+    }
+  ]
+}

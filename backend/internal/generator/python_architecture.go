@@ -7,6 +7,7 @@ import (
 
 func (e *Engine) generatePythonMonolith(tree *FileTree, req GenerateRequest) error {
 	specs := pythonMonolithTemplateSpecs(req)
+	withCRUD := isEnabled(req.FileToggles.ExampleCRUD)
 	data := map[string]any{
 		"Framework":    req.Framework,
 		"Architecture": req.Architecture,
@@ -16,6 +17,7 @@ func (e *Engine) generatePythonMonolith(tree *FileTree, req GenerateRequest) err
 		"UseORM":       req.UseORM,
 		"DBKind":       req.Database,
 		"Service":      "app",
+		"WithCRUD":     withCRUD,
 	}
 
 	if req.Framework == "django" {
@@ -39,6 +41,7 @@ func (e *Engine) generatePythonMonolith(tree *FileTree, req GenerateRequest) err
 
 func (e *Engine) generatePythonService(tree *FileTree, req GenerateRequest, svcRoot string, svc ServiceConfig) error {
 	specs := pythonMicroserviceTemplateSpecs(req)
+	withCRUD := isEnabled(req.FileToggles.ExampleCRUD)
 	data := map[string]any{
 		"Framework":    req.Framework,
 		"Architecture": req.Architecture,
@@ -48,6 +51,7 @@ func (e *Engine) generatePythonService(tree *FileTree, req GenerateRequest, svcR
 		"UseORM":       req.UseORM,
 		"DBKind":       req.Database,
 		"Service":      svc.Name,
+		"WithCRUD":     withCRUD,
 	}
 
 	if req.Framework == "django" {

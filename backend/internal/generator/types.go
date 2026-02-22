@@ -83,10 +83,17 @@ type RootOptions struct {
 }
 
 type GenerateResponse struct {
-	BashScript       string   `json:"bash_script"`
-	PowerShellScript string   `json:"powershell_script"`
-	FilePaths        []string `json:"file_paths"`
-	Warnings         []string `json:"warnings"`
+	BashScript       string          `json:"bash_script"`
+	PowerShellScript string          `json:"powershell_script"`
+	FilePaths        []string        `json:"file_paths"`
+	Warnings         []string        `json:"warnings"`
+	Decisions        []DecisionEntry `json:"decisions"`
+}
+
+type DecisionEntry struct {
+	Code     string `json:"code"`
+	Category string `json:"category"`
+	Message  string `json:"message"`
 }
 
 type FileTree struct {

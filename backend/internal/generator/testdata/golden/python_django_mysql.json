@@ -1,0 +1,77 @@
+{
+  "bash_script": "#!/usr/bin/env bash\nset -euo pipefail\n\nROOT_DIR=\"golden-django\"\nmkdir -p \"$ROOT_DIR\"\ncd \"$ROOT_DIR\"\n\ngit init\nmkdir -p \"api\"\nmkdir -p \"app\"\nmkdir -p \"config\"\nmkdir -p \"db\"\nmkdir -p \"db/init\"\nmkdir -p \"migrations\"\n\ncat \u003e \".env\" \u003c\u003c'EOF_STACKSPRINT_GEN_9942'\nPORT=8080\nDATABASE_URL=mysql://app:app@mysql:3306/app\nEOF_STACKSPRINT_GEN_9942\n\ncat \u003e \".gitignore\" \u003c\u003c'EOF_STACKSPRINT_GEN_9942'\n# StackSprint\n.env\n*.log\n.DS_Store\n__pycache__/\n.venv/\nEOF_STACKSPRINT_GEN_9942\n\ncat \u003e \"Dockerfile\" \u003c\u003c'EOF_STACKSPRINT_GEN_9942'\nFROM python:3.12-slim\nWORKDIR /app\nCOPY requirements.txt .\nRUN pip install --no-cache-dir -r requirements.txt\nCOPY . .\nEXPOSE 8080\nCMD [\"python\", \"manage.py\", \"runserver\", \"0.0.0.0:8080\"]\nEOF_STACKSPRINT_GEN_9942\n\ncat \u003e \"README.md\" \u003c\u003c'EOF_STACKSPRINT_GEN_9942'\n# StackSprint Generated Project\n\nLanguage: python\nFramework: django\nArchitecture: mvp\nDatabase: mysql\n\n## Run\n\n```bash\ndocker compose up --build\n```\nEOF_STACKSPRINT_GEN_9942\n\ncat \u003e \"api/__init__.py\" \u003c\u003c'EOF_STACKSPRINT_GEN_9942'\n\nEOF_STACKSPRINT_GEN_9942\n\ncat \u003e \"api/apps.py\" \u003c\u003c'EOF_STACKSPRINT_GEN_9942'\nfrom django.apps import AppConfig\n\nclass ApiConfig(AppConfig):\n    default_auto_field = 'django.db.models.BigAutoField'\n    name = 'api'\nEOF_STACKSPRINT_GEN_9942\n\ncat \u003e \"api/models.py\" \u003c\u003c'EOF_STACKSPRINT_GEN_9942'\nfrom django.db import models\n\nclass Item(models.Model):\n    name = models.CharField(max_length=255)\nEOF_STACKSPRINT_GEN_9942\n\ncat \u003e \"api/urls.py\" \u003c\u003c'EOF_STACKSPRINT_GEN_9942'\nfrom django.urls import path\nfrom .views import health, items\n\nurlpatterns = [\n    path('health', health),\n    path('items', items),\n]\nEOF_STACKSPRINT_GEN_9942\n\ncat \u003e \"api/views.py\" \u003c\u003c'EOF_STACKSPRINT_GEN_9942'\nfrom rest_framework.decorators import api_view\nfrom rest_framework.response import Response\n\n@api_view(['GET'])\ndef items(request):\n    return Response([{\"id\": 1, \"name\": \"sample\"}])\nEOF_STACKSPRINT_GEN_9942\n\ncat \u003e \"app/health.py\" \u003c\u003c'EOF_STACKSPRINT_GEN_9942'\ndef health():\n    return {\"status\": \"ok\"}\nEOF_STACKSPRINT_GEN_9942\n\ncat \u003e \"app/routes.py\" \u003c\u003c'EOF_STACKSPRINT_GEN_9942'\nBASE_PATH = '/api/v1'\nEOF_STACKSPRINT_GEN_9942\n\ncat \u003e \"config/__init__.py\" \u003c\u003c'EOF_STACKSPRINT_GEN_9942'\n\nEOF_STACKSPRINT_GEN_9942\n\ncat \u003e \"config/settings.py\" \u003c\u003c'EOF_STACKSPRINT_GEN_9942'\nfrom pathlib import Path\n\nBASE_DIR = Path(__file__).resolve().parent.parent\nSECRET_KEY = 'dev'\nDEBUG = True\nALLOWED_HOSTS = ['*']\nINSTALLED_APPS = ['django.contrib.contenttypes', 'django.contrib.auth', 'rest_framework', 'api']\nMIDDLEWARE = []\nROOT_URLCONF = 'config.urls'\nTEMPLATES = []\nWSGI_APPLICATION = 'config.wsgi.application'\nDATABASES = {'default': {\"ENGINE\": \"django.db.backends.mysql\", \"NAME\": \"app\", \"USER\": \"app\", \"PASSWORD\": \"app\", \"HOST\": \"mysql\", \"PORT\": \"3306\"}}\nLANGUAGE_CODE = 'en-us'\nTIME_ZONE = 'UTC'\nUSE_I18N = True\nUSE_TZ = True\nEOF_STACKSPRINT_GEN_9942\n\ncat \u003e \"config/urls.py\" \u003c\u003c'EOF_STACKSPRINT_GEN_9942'\nfrom django.urls import include, path\n\nurlpatterns = [path('api/', include('api.urls')),]\nEOF_STACKSPRINT_GEN_9942\n\ncat \u003e \"config/wsgi.py\" \u003c\u003c'EOF_STACKSPRINT_GEN_9942'\nimport os\nfrom django.core.wsgi import get_wsgi_application\nos.environ.setdefault('DJANGO_SETTINGS_MODULE', 'config.settings')\napplication = get_wsgi_application()\nEOF_STACKSPRINT_GEN_9942\n\ncat \u003e \"db/init/001_init.sql\" \u003c\u003c'EOF_STACKSPRINT_GEN_9942'\nCREATE TABLE IF NOT EXISTS items (\n  id SERIAL PRIMARY KEY,\n  name VARCHAR(255)\n);\nINSERT INTO items DEFAULT VALUES;\n\n\nEOF_STACKSPRINT_GEN_9942\n\ncat \u003e \"docker-compose.yaml\" \u003c\u003c'EOF_STACKSPRINT_GEN_9942'\nservices:\n  app:\n    build: .\n    ports:\n      - \"8080:8080\"\n    env_file:\n      - ./.env\n    depends_on:\n      mysql:\n        condition: service_healthy\n  mysql:\n    image: mysql:8.4\n    environment:\n      MYSQL_DATABASE: app\n      MYSQL_USER: app\n      MYSQL_PASSWORD: app\n      MYSQL_ROOT_PASSWORD: root\n    volumes:\n      - ./db/init:/docker-entrypoint-initdb.d\n    ports:\n      - \"3306:3306\"\n    healthcheck:\n      test: [\"CMD-SHELL\", \"mysqladmin ping -h localhost -uapp -papp\"]\n      interval: 5s\n      timeout: 5s\n      retries: 12\nEOF_STACKSPRINT_GEN_9942\n\ncat \u003e \"manage.py\" \u003c\u003c'EOF_STACKSPRINT_GEN_9942'\n#!/usr/bin/env python\nimport os\nimport sys\n\nif __name__ == '__main__':\n    os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'config.settings')\n    from django.core.management import execute_from_command_line\n    execute_from_command_line(sys.argv)\nEOF_STACKSPRINT_GEN_9942\n\ncat \u003e \"migrations/001_initial.sql\" \u003c\u003c'EOF_STACKSPRINT_GEN_9942'\nCREATE TABLE IF NOT EXISTS items (\n  id SERIAL PRIMARY KEY,\n  name VARCHAR(255)\n);\n\n\nEOF_STACKSPRINT_GEN_9942\n\ncat \u003e \"requirements.txt\" \u003c\u003c'EOF_STACKSPRINT_GEN_9942'\nDjango==5.1.5\ndjangorestframework==3.15.2\nmysqlclient==2.2.7\nEOF_STACKSPRINT_GEN_9942\n\necho \"StackSprint project generated successfully.\"\necho \"Run: docker compose up --build\"\n",
+  "powershell_script": "$ErrorActionPreference = 'Stop'\n\n$RootDir = 'golden-django'\nNew-Item -ItemType Directory -Path $RootDir -Force | Out-Null\nSet-Location $RootDir\n\ngit init\nNew-Item -ItemType Directory -Path 'api' -Force | Out-Null\nNew-Item -ItemType Directory -Path 'app' -Force | Out-Null\nNew-Item -ItemType Directory -Path 'config' -Force | Out-Null\nNew-Item -ItemType Directory -Path 'db' -Force | Out-Null\nNew-Item -ItemType Directory -Path 'db/init' -Force | Out-Null\nNew-Item -ItemType Directory -Path 'migrations' -Force | Out-Null\n\n@'\nPORT=8080\nDATABASE_URL=mysql://app:app@mysql:3306/app\n'@ | Set-Content -NoNewline '.env'\n\n@'\n# StackSprint\n.env\n*.log\n.DS_Store\n__pycache__/\n.venv/\n'@ | Set-Content -NoNewline '.gitignore'\n\n@'\nFROM python:3.12-slim\nWORKDIR /app\nCOPY requirements.txt .\nRUN pip install --no-cache-dir -r requirements.txt\nCOPY . .\nEXPOSE 8080\nCMD [\"python\", \"manage.py\", \"runserver\", \"0.0.0.0:8080\"]\n'@ | Set-Content -NoNewline 'Dockerfile'\n\n@'\n# StackSprint Generated Project\n\nLanguage: python\nFramework: django\nArchitecture: mvp\nDatabase: mysql\n\n## Run\n\n```bash\ndocker compose up --build\n```\n'@ | Set-Content -NoNewline 'README.md'\n\n@'\n\n'@ | Set-Content -NoNewline 'api/__init__.py'\n\n@'\nfrom django.apps import AppConfig\n\nclass ApiConfig(AppConfig):\n    default_auto_field = 'django.db.models.BigAutoField'\n    name = 'api'\n'@ | Set-Content -NoNewline 'api/apps.py'\n\n@'\nfrom django.db import models\n\nclass Item(models.Model):\n    name = models.CharField(max_length=255)\n'@ | Set-Content -NoNewline 'api/models.py'\n\n@'\nfrom django.urls import path\nfrom .views import health, items\n\nurlpatterns = [\n    path('health', health),\n    path('items', items),\n]\n'@ | Set-Content -NoNewline 'api/urls.py'\n\n@'\nfrom rest_framework.decorators import api_view\nfrom rest_framework.response import Response\n\n@api_view(['GET'])\ndef items(request):\n    return Response([{\"id\": 1, \"name\": \"sample\"}])\n'@ | Set-Content -NoNewline 'api/views.py'\n\n@'\ndef health():\n    return {\"status\": \"ok\"}\n'@ | Set-Content -NoNewline 'app/health.py'\n\n@'\nBASE_PATH = '/api/v1'\n'@ | Set-Content -NoNewline 'app/routes.py'\n\n@'\n\n'@ | Set-Content -NoNewline 'config/__init__.py'\n\n@'\nfrom pathlib import Path\n\nBASE_DIR = Path(__file__).resolve().parent.parent\nSECRET_KEY = 'dev'\nDEBUG = True\nALLOWED_HOSTS = ['*']\nINSTALLED_APPS = ['django.contrib.contenttypes', 'django.contrib.auth', 'rest_framework', 'api']\nMIDDLEWARE = []\nROOT_URLCONF = 'config.urls'\nTEMPLATES = []\nWSGI_APPLICATION = 'config.wsgi.application'\nDATABASES = {'default': {\"ENGINE\": \"django.db.backends.mysql\", \"NAME\": \"app\", \"USER\": \"app\", \"PASSWORD\": \"app\", \"HOST\": \"mysql\", \"PORT\": \"3306\"}}\nLANGUAGE_CODE = 'en-us'\nTIME_ZONE = 'UTC'\nUSE_I18N = True\nUSE_TZ = True\n'@ | Set-Content -NoNewline 'config/settings.py'\n\n@'\nfrom django.urls import include, path\n\nurlpatterns = [path('api/', include('api.urls')),]\n'@ | Set-Content -NoNewline 'config/urls.py'\n\n@'\nimport os\nfrom django.core.wsgi import get_wsgi_application\nos.environ.setdefault('DJANGO_SETTINGS_MODULE', 'config.settings')\napplication = get_wsgi_application()\n'@ | Set-Content -NoNewline 'config/wsgi.py'\n\n@'\nCREATE TABLE IF NOT EXISTS items (\n  id SERIAL PRIMARY KEY,\n  name VARCHAR(255)\n);\nINSERT INTO items DEFAULT VALUES;\n\n\n'@ | Set-Content -NoNewline 'db/init/001_init.sql'\n\n@'\nservices:\n  app:\n    build: .\n    ports:\n      - \"8080:8080\"\n    env_file:\n      - ./.env\n    depends_on:\n      mysql:\n        condition: service_healthy\n  mysql:\n    image: mysql:8.4\n    environment:\n      MYSQL_DATABASE: app\n      MYSQL_USER: app\n      MYSQL_PASSWORD: app\n      MYSQL_ROOT_PASSWORD: root\n    volumes:\n      - ./db/init:/docker-entrypoint-initdb.d\n    ports:\n      - \"3306:3306\"\n    healthcheck:\n      test: [\"CMD-SHELL\", \"mysqladmin ping -h localhost -uapp -papp\"]\n      interval: 5s\n      timeout: 5s\n      retries: 12\n'@ | Set-Content -NoNewline 'docker-compose.yaml'\n\n@'\n#!/usr/bin/env python\nimport os\nimport sys\n\nif __name__ == '__main__':\n    os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'config.settings')\n    from django.core.management import execute_from_command_line\n    execute_from_command_line(sys.argv)\n'@ | Set-Content -NoNewline 'manage.py'\n\n@'\nCREATE TABLE IF NOT EXISTS items (\n  id SERIAL PRIMARY KEY,\n  name VARCHAR(255)\n);\n\n\n'@ | Set-Content -NoNewline 'migrations/001_initial.sql'\n\n@'\nDjango==5.1.5\ndjangorestframework==3.15.2\nmysqlclient==2.2.7\n'@ | Set-Content -NoNewline 'requirements.txt'\n\nWrite-Host 'StackSprint project generated successfully.'\nWrite-Host 'Run: docker compose up --build'\n",
+  "file_paths": [
+    ".env",
+    ".gitignore",
+    "Dockerfile",
+    "README.md",
+    "api",
+    "api/__init__.py",
+    "api/apps.py",
+    "api/models.py",
+    "api/urls.py",
+    "api/views.py",
+    "app",
+    "app/health.py",
+    "app/routes.py",
+    "config",
+    "config/__init__.py",
+    "config/settings.py",
+    "config/urls.py",
+    "config/wsgi.py",
+    "db",
+    "db/init",
+    "db/init/001_init.sql",
+    "docker-compose.yaml",
+    "manage.py",
+    "migrations",
+    "migrations/001_initial.sql",
+    "requirements.txt"
+  ],
+  "warnings": [
+    "use_orm was disabled because Django already uses its built-in ORM."
+  ],
+  "decisions": [
+    {
+      "code": "rule.01",
+      "category": "rule",
+      "message": "use_orm was disabled because Django already uses its built-in ORM."
+    },
+    {
+      "code": "stack.core",
+      "category": "stack",
+      "message": "Language=python, Framework=django, Architecture=mvp."
+    },
+    {
+      "code": "arch.monolith",
+      "category": "architecture",
+      "message": "Generated a single-service project structure."
+    },
+    {
+      "code": "db.selected",
+      "category": "database",
+      "message": "Database=mysql with ORM disabled."
+    },
+    {
+      "code": "output.compose",
+      "category": "output",
+      "message": "docker-compose.yaml included."
+    },
+    {
+      "code": "output.dockerfile",
+      "category": "output",
+      "message": "Dockerfile boilerplate included."
+    },
+    {
+      "code": "output.readme",
+      "category": "output",
+      "message": "README.md included."
+    },
+    {
+      "code": "output.tree",
+      "category": "output",
+      "message": "Generated 20 files and 6 directories."
+    }
+  ]
+}

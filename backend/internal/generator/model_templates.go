@@ -78,7 +78,7 @@ datasource db {
 {{ range .Models -}}
 model {{ .Name }} {
 {{- range .Fields }}
-  {{ prismaFieldName .Name }} {{ prismaType .Type }}
+  {{ prismaFieldLine .Name .Type }}
 {{- end }}
 }
 
@@ -91,6 +91,7 @@ model {{ .Name }} {
 	t, err := template.New("prisma").Funcs(template.FuncMap{
 		"prismaType":      prismaType,
 		"prismaFieldName": prismaFieldName,
+		"prismaFieldLine": prismaFieldLine,
 	}).Parse(tpl)
 	if err != nil {
 		return ""
@@ -170,9 +171,17 @@ func prismaType(v string) string {
 func prismaFieldName(v string) string {
 	name := strings.TrimSpace(v)
 	if strings.EqualFold(name, "id") {
-		return "id Int @id @default(autoincrement())"
+		return "id"
 	}
 	return name
+}
+
+func prismaFieldLine(name, fieldType string) string {
+	fieldName := prismaFieldName(name)
+	if strings.EqualFold(fieldName, "id") {
+		return "id Int @id @default(autoincrement())"
+	}
+	return fieldName + " " + prismaType(fieldType)
 }
 
 func sqlalchemyType(v string) string {

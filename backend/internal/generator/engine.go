@@ -17,6 +17,12 @@ func NewEngine(registry *TemplateRegistry) *Engine {
 
 func (e *Engine) Generate(_ context.Context, req GenerateRequest) (GenerateResponse, error) {
 	req = normalize(req)
+	var ruleWarnings []string
+	var err error
+	req, ruleWarnings, err = ApplyRuleEngine(req)
+	if err != nil {
+		return GenerateResponse{}, err
+	}
 	if err := Validate(req); err != nil {
 		return GenerateResponse{}, err
 	}
@@ -29,7 +35,7 @@ func (e *Engine) Generate(_ context.Context, req GenerateRequest) (GenerateRespo
 	}
 	applyCustomizations(&tree, req.Custom)
 
-	return BuildScripts(req, tree)
+	return BuildScripts(req, tree, ruleWarnings)
 }
 
 func normalize(req GenerateRequest) GenerateRequest {
@@ -55,9 +61,17 @@ func normalize(req GenerateRequest) GenerateRequest {
 	}
 	if req.Architecture == "microservices" && len(req.Custom.AddServiceNames) > 0 {
 		basePort := 8081
+		existingPorts := map[string]int{}
+		for _, svc := range req.Services {
+			existingPorts[strings.ToLower(strings.TrimSpace(svc.Name))] = svc.Port
+		}
 		req.Services = req.Services[:0]
 		for i, name := range req.Custom.AddServiceNames {
-			req.Services = append(req.Services, ServiceConfig{Name: name, Port: basePort + i})
+			port := basePort + i
+			if preserved, ok := existingPorts[strings.ToLower(strings.TrimSpace(name))]; ok && preserved > 0 {
+				port = preserved
+			}
+			req.Services = append(req.Services, ServiceConfig{Name: name, Port: port})
 		}
 	}
 	return req
