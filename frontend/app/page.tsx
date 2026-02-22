@@ -28,6 +28,7 @@ export default function Page() {
   const [framework, setFramework] = useState('fiber');
   const [architecture, setArchitecture] = useState('mvp');
   const [db, setDb] = useState('postgresql');
+  const [useORM, setUseORM] = useState(true);
   const [serviceCommunication, setServiceCommunication] = useState('none');
   const [services, setServices] = useState<Service[]>([
     { name: 'users', port: 8081 },
@@ -66,6 +67,7 @@ export default function Page() {
   const [removeFiles, setRemoveFiles] = useState('');
   const [bashScript, setBashScript] = useState('');
   const [powerShellScript, setPowerShellScript] = useState('');
+  const [filePaths, setFilePaths] = useState<string[]>([]);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [previewLoading, setPreviewLoading] = useState(false);
@@ -86,6 +88,7 @@ export default function Page() {
     architecture,
     services: architecture === 'microservices' ? services : [],
     db,
+    use_orm: useORM,
     service_communication: serviceCommunication,
     infra,
     features,
@@ -110,6 +113,7 @@ export default function Page() {
     architecture,
     services,
     db,
+    useORM,
     serviceCommunication,
     infra,
     features,
@@ -147,6 +151,7 @@ export default function Page() {
       }
       setBashScript(body.bash_script || '');
       setPowerShellScript(body.powershell_script || '');
+      setFilePaths(Array.isArray(body.file_paths) ? body.file_paths : []);
     } catch (e) {
       if ((e as Error).name !== 'AbortError') {
         setError(String(e));
@@ -300,6 +305,10 @@ export default function Page() {
                 <option value="none">None</option>
               </select>
             </div>
+            <label className="toggle orm-toggle">
+              <input type="checkbox" checked={useORM} onChange={(e) => setUseORM(e.target.checked)} />
+              <span>Use ORM (GORM / Prisma / SQLAlchemy)</span>
+            </label>
             <div className="toggle-grid">
               {infraKeys.map((item) => (
                 <label className="toggle" key={item.key}>
@@ -436,6 +445,20 @@ export default function Page() {
             <div className="download-row">
               <button className="primary" disabled={!bashScript} onClick={() => download('stacksprint-init.sh', bashScript)}>Download Bash</button>
               <button className="ghost" disabled={!powerShellScript} onClick={() => download('stacksprint-init.ps1', powerShellScript)}>Download PowerShell</button>
+            </div>
+            <label>Project Explorer</label>
+            <div className="file-tree">
+              {filePaths.length === 0 && <div className="file-tree-empty">No generated paths yet.</div>}
+              {filePaths.map((item) => {
+                const depth = item.split('/').filter(Boolean).length - 1;
+                const isDir = !item.includes('.');
+                return (
+                  <div key={item} className="file-tree-row" style={{ paddingLeft: `${depth * 14 + 8}px` }}>
+                    <span className="file-tree-icon">{isDir ? '▸' : '•'}</span>
+                    <span>{item}</span>
+                  </div>
+                );
+              })}
             </div>
             <label>Script Preview</label>
             <pre>{bashScript || '# script preview will appear here after configuration is valid'}</pre>
