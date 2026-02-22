@@ -5,6 +5,8 @@ import { useEffect, useMemo, useState } from 'react';
 type Service = { name: string; port: number };
 type ToggleItem = { key: string; label: string };
 type CustomFileEntry = { path: string; content: string };
+type SchemaField = { name: string; type: string };
+type SchemaModel = { name: string; fields: SchemaField[] };
 type SavedPreset = { name: string; config: Record<string, unknown> };
 
 const PRESET_STORAGE_KEY = 'stacksprint_presets_v1';
@@ -65,6 +67,9 @@ export default function Page() {
   const [rootPath, setRootPath] = useState('.');
   const [moduleName, setModuleName] = useState('github.com/example/my-stacksprint-app');
   const [customFolders, setCustomFolders] = useState('');
+  const [schemaModels, setSchemaModels] = useState<SchemaModel[]>([
+    { name: 'Item', fields: [{ name: 'id', type: 'int' }, { name: 'name', type: 'string' }] }
+  ]);
   const [customFileEntries, setCustomFileEntries] = useState<CustomFileEntry[]>([{ path: '', content: '' }]);
   const [removeFolders, setRemoveFolders] = useState('');
   const [removeFiles, setRemoveFiles] = useState('');
@@ -101,6 +106,12 @@ export default function Page() {
     file_toggles: fileToggles,
     custom: {
       add_folders: parseCsv(customFolders),
+      models: schemaModels
+        .filter((model) => model.name.trim() !== '')
+        .map((model) => ({
+          name: model.name.trim(),
+          fields: model.fields.filter((field) => field.name.trim() !== '')
+        })),
       add_files: customFileEntries
         .filter((item) => item.path.trim() !== '')
         .map((item) => ({ path: item.path.trim(), content: item.content })),
@@ -127,6 +138,7 @@ export default function Page() {
     features,
     fileToggles,
     customFolders,
+    schemaModels,
     customFileEntries,
     removeFolders,
     removeFiles,
@@ -217,6 +229,52 @@ export default function Page() {
     setCustomFileEntries((prev) => [...prev, { path: '', content: '' }]);
   }
 
+  function addModel() {
+    setSchemaModels((prev) => [...prev, { name: '', fields: [{ name: 'name', type: 'string' }] }]);
+  }
+
+  function removeModel(index: number) {
+    setSchemaModels((prev) => {
+      if (prev.length === 1) return [{ name: '', fields: [{ name: 'name', type: 'string' }] }];
+      return prev.filter((_, i) => i !== index);
+    });
+  }
+
+  function updateModelName(index: number, name: string) {
+    setSchemaModels((prev) => prev.map((model, i) => (i === index ? { ...model, name } : model)));
+  }
+
+  function addField(modelIndex: number) {
+    setSchemaModels((prev) =>
+      prev.map((model, i) => (
+        i === modelIndex ? { ...model, fields: [...model.fields, { name: '', type: 'string' }] } : model
+      ))
+    );
+  }
+
+  function removeField(modelIndex: number, fieldIndex: number) {
+    setSchemaModels((prev) =>
+      prev.map((model, i) => {
+        if (i !== modelIndex) return model;
+        if (model.fields.length === 1) return { ...model, fields: [{ name: '', type: 'string' }] };
+        return { ...model, fields: model.fields.filter((_, idx) => idx !== fieldIndex) };
+      })
+    );
+  }
+
+  function updateField(modelIndex: number, fieldIndex: number, patch: Partial<SchemaField>) {
+    setSchemaModels((prev) =>
+      prev.map((model, i) => (
+        i === modelIndex
+          ? {
+            ...model,
+            fields: model.fields.map((field, idx) => (idx === fieldIndex ? { ...field, ...patch } : field))
+          }
+          : model
+      ))
+    );
+  }
+
   function removeCustomFileRow(index: number) {
     setCustomFileEntries((prev) => {
       if (prev.length === 1) return [{ path: '', content: '' }];
@@ -257,6 +315,8 @@ export default function Page() {
 
     const custom = (config.custom as Record<string, unknown>) || {};
     setCustomFolders(Array.isArray(custom.add_folders) ? (custom.add_folders as string[]).join(', ') : '');
+    const models = Array.isArray(custom.models) ? (custom.models as SchemaModel[]) : [];
+    setSchemaModels(models.length > 0 ? models : [{ name: 'Item', fields: [{ name: 'id', type: 'int' }, { name: 'name', type: 'string' }] }]);
     const addFiles = Array.isArray(custom.add_files) ? (custom.add_files as CustomFileEntry[]) : [];
     setCustomFileEntries(addFiles.length > 0 ? addFiles : [{ path: '', content: '' }]);
     setRemoveFolders(Array.isArray(custom.remove_folders) ? (custom.remove_folders as string[]).join(', ') : '');
@@ -409,6 +469,43 @@ export default function Page() {
               <input type="checkbox" checked={useORM} onChange={(e) => setUseORM(e.target.checked)} />
               <span>Use ORM (GORM / Prisma / SQLAlchemy)</span>
             </label>
+            <div className="schema-builder">
+              <label>Schema Builder</label>
+              {schemaModels.map((model, modelIndex) => (
+                <div className="schema-model" key={`model-${modelIndex}`}>
+                  <div className="row">
+                    <input
+                      value={model.name}
+                      onChange={(e) => updateModelName(modelIndex, e.target.value)}
+                      placeholder="Model Name (e.g. User)"
+                    />
+                    <button type="button" className="ghost" onClick={() => removeModel(modelIndex)}>Remove Model</button>
+                  </div>
+                  {model.fields.map((field, fieldIndex) => (
+                    <div className="row schema-field" key={`field-${modelIndex}-${fieldIndex}`}>
+                      <input
+                        value={field.name}
+                        onChange={(e) => updateField(modelIndex, fieldIndex, { name: e.target.value })}
+                        placeholder="field name"
+                      />
+                      <select
+                        value={field.type}
+                        onChange={(e) => updateField(modelIndex, fieldIndex, { type: e.target.value })}
+                      >
+                        <option value="string">string</option>
+                        <option value="int">int</option>
+                        <option value="float">float</option>
+                        <option value="bool">bool</option>
+                        <option value="datetime">datetime</option>
+                      </select>
+                      <button type="button" className="ghost" onClick={() => removeField(modelIndex, fieldIndex)}>Remove Field</button>
+                    </div>
+                  ))}
+                  <button type="button" className="ghost" onClick={() => addField(modelIndex)}>Add Field</button>
+                </div>
+              ))}
+              <button type="button" className="ghost" onClick={addModel}>Add Model</button>
+            </div>
             <div className="toggle-grid">
               {infraKeys.map((item) => (
                 <label className="toggle" key={item.key}>
