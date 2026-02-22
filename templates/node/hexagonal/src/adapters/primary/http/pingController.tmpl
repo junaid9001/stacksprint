@@ -1,0 +1,7 @@
+import { PingService } from '../../../core/services/pingService.js';
+
+const service = new PingService();
+
+export async function pingController(req, res) {
+  res.json(service.ping());
+}

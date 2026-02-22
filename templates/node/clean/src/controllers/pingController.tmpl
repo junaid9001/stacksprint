@@ -1,0 +1,5 @@
+import { pingUsecase } from '../usecases/pingUsecase.js';
+
+export async function pingController(req, res) {
+  res.json(await pingUsecase());
+}

@@ -1,0 +1,5 @@
+package services
+
+func Ping() string {
+	return "pong"
+}

@@ -1,0 +1,9 @@
+from fastapi import APIRouter
+from app.core.services.ping_service import PingService
+
+ping_router = APIRouter(prefix='/ping', tags=['ping'])
+service = PingService()
+
+@ping_router.get('')
+def ping_controller():
+    return service.ping()
