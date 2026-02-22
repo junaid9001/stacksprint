@@ -7,6 +7,9 @@ func addInfraBoilerplate(tree *FileTree, req GenerateRequest, root string) {
 	if req.Infra.Kafka {
 		addKafkaBoilerplate(tree, req, root)
 	}
+	if req.Infra.NATS {
+		addNATSBoilerplate(tree, req, root)
+	}
 }
 
 func addRedisBoilerplate(tree *FileTree, req GenerateRequest, root string) {
@@ -57,5 +60,20 @@ func addGRPCBoilerplate(tree *FileTree, req GenerateRequest, root string) {
 	case "python":
 		addFile(tree, prefix+"app/grpc_server.py", "def start_grpc_server() -> str:\n    return 'gRPC server stub started'\n")
 		addFile(tree, prefix+"app/grpc_client.py", "def ping_grpc(target: str = '127.0.0.1:9090') -> str:\n    return f'gRPC client stub pinging {target}'\n")
+	}
+}
+
+func addNATSBoilerplate(tree *FileTree, req GenerateRequest, root string) {
+	prefix := root
+	if prefix != "" {
+		prefix += "/"
+	}
+	switch req.Language {
+	case "go":
+		addFile(tree, prefix+"internal/messaging/nats_client.go", "package messaging\n\nimport \"os\"\n\ntype NATSClient struct {\n\tURL string\n}\n\nfunc NewNATSClient() *NATSClient {\n\tu := os.Getenv(\"NATS_URL\")\n\tif u == \"\" {\n\t\tu = \"nats://nats:4222\"\n\t}\n\treturn &NATSClient{URL: u}\n}\n\nfunc (c *NATSClient) Publish(subject, payload string) string {\n\treturn \"nats publish stub to \" + subject + \" via \" + c.URL + \" payload=\" + payload\n}\n")
+	case "node":
+		addFile(tree, prefix+"src/messaging/natsClient.js", "export class NatsClient {\n  constructor(url = process.env.NATS_URL || 'nats://nats:4222') {\n    this.url = url;\n  }\n\n  publish(subject, payload) {\n    return `nats publish stub to ${subject} via ${this.url}: ${payload}`;\n  }\n}\n")
+	case "python":
+		addFile(tree, prefix+"app/messaging/nats_client.py", "import os\n\nclass NatsClient:\n    def __init__(self, url: str | None = None):\n        self.url = url or os.getenv('NATS_URL', 'nats://nats:4222')\n\n    def publish(self, subject: str, payload: str) -> str:\n        return f'nats publish stub to {subject} via {self.url}: {payload}'\n")
 	}
 }

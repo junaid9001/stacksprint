@@ -10,8 +10,40 @@ type SchemaModel = { name: string; fields: SchemaField[] };
 type SavedPreset = { name: string; config: Record<string, unknown> };
 type DecisionEntry = { code: string; category: string; message: string };
 type ScriptKind = 'bash' | 'powershell';
+type OutputTab = 'scripts' | 'decisions' | 'files';
 
 const PRESET_STORAGE_KEY = 'stacksprint_presets_v1';
+const SERVICE_NAME_REGEX = /^[a-zA-Z][a-zA-Z0-9_-]*$/;
+const DEFAULT_SERVICES: Service[] = [
+  { name: 'users', port: 8081 },
+  { name: 'orders', port: 8082 }
+];
+const DEFAULT_INFRA = { redis: false, kafka: false, nats: false };
+const DEFAULT_FEATURES = {
+  jwt_auth: false,
+  swagger: true,
+  github_actions_ci: true,
+  makefile: true,
+  logger: true,
+  global_error_handler: true,
+  health_endpoint: true,
+  sample_test: true
+};
+const DEFAULT_FILE_TOGGLES = {
+  env: true,
+  gitignore: true,
+  dockerfile: true,
+  docker_compose: true,
+  readme: true,
+  config_loader: true,
+  logger: true,
+  base_route: true,
+  example_crud: true,
+  health_check: true
+};
+const DEFAULT_MODELS: SchemaModel[] = [
+  { name: 'Item', fields: [{ name: 'id', type: 'int' }, { name: 'name', type: 'string' }] }
+];
 
 const infraKeys: ToggleItem[] = [
   { key: 'redis', label: 'Redis' },
@@ -37,41 +69,17 @@ export default function Page() {
   const [db, setDb] = useState('postgresql');
   const [useORM, setUseORM] = useState(true);
   const [serviceCommunication, setServiceCommunication] = useState('none');
-  const [services, setServices] = useState<Service[]>([
-    { name: 'users', port: 8081 },
-    { name: 'orders', port: 8082 }
-  ]);
-  const [infra, setInfra] = useState({ redis: false, kafka: false, nats: false });
-  const [features, setFeatures] = useState({
-    jwt_auth: false,
-    swagger: true,
-    github_actions_ci: true,
-    makefile: true,
-    logger: true,
-    global_error_handler: true,
-    health_endpoint: true,
-    sample_test: true
-  });
-  const [fileToggles, setFileToggles] = useState({
-    env: true,
-    gitignore: true,
-    dockerfile: true,
-    docker_compose: true,
-    readme: true,
-    config_loader: true,
-    logger: true,
-    base_route: true,
-    example_crud: true,
-    health_check: true
-  });
+  const [services, setServices] = useState<Service[]>(DEFAULT_SERVICES);
+  const [infra, setInfra] = useState(DEFAULT_INFRA);
+  const [features, setFeatures] = useState(DEFAULT_FEATURES);
+  const [fileToggles, setFileToggles] = useState(DEFAULT_FILE_TOGGLES);
   const [rootMode, setRootMode] = useState('new');
+  const [gitInit, setGitInit] = useState(true);
   const [rootName, setRootName] = useState('my-stacksprint-app');
   const [rootPath, setRootPath] = useState('.');
   const [moduleName, setModuleName] = useState('github.com/example/my-stacksprint-app');
   const [customFolders, setCustomFolders] = useState('');
-  const [schemaModels, setSchemaModels] = useState<SchemaModel[]>([
-    { name: 'Item', fields: [{ name: 'id', type: 'int' }, { name: 'name', type: 'string' }] }
-  ]);
+  const [schemaModels, setSchemaModels] = useState<SchemaModel[]>(DEFAULT_MODELS);
   const [customFileEntries, setCustomFileEntries] = useState<CustomFileEntry[]>([{ path: '', content: '' }]);
   const [removeFolders, setRemoveFolders] = useState('');
   const [removeFiles, setRemoveFiles] = useState('');
@@ -86,6 +94,7 @@ export default function Page() {
   const [previewLoading, setPreviewLoading] = useState(false);
   const [activeStep, setActiveStep] = useState(0);
   const [activeScript, setActiveScript] = useState<ScriptKind>('bash');
+  const [activeOutputTab, setActiveOutputTab] = useState<OutputTab>('scripts');
   const [copyStatus, setCopyStatus] = useState('');
 
   const frameworkChoices = useMemo(() => {
@@ -139,7 +148,7 @@ export default function Page() {
       mode: rootMode,
       name: rootName,
       path: rootPath,
-      git_init: true,
+      git_init: gitInit,
       module: moduleName
     }
   }), [
@@ -159,10 +168,26 @@ export default function Page() {
     removeFolders,
     removeFiles,
     rootMode,
+    gitInit,
     rootName,
     rootPath,
     moduleName
   ]);
+
+  useEffect(() => {
+    if (architecture === 'microservices' && serviceCommunication === 'none') {
+      setServiceCommunication('http');
+    }
+    if (architecture !== 'microservices' && services.length < 2) {
+      setServices(DEFAULT_SERVICES);
+    }
+  }, [architecture, serviceCommunication, services.length]);
+
+  useEffect(() => {
+    if (rootMode === 'existing' && gitInit) {
+      setGitInit(false);
+    }
+  }, [rootMode, gitInit]);
 
   useEffect(() => {
     try {
@@ -191,9 +216,12 @@ export default function Page() {
         body: JSON.stringify(payload),
         signal
       });
-      const body = await res.json();
+      const raw = await res.text();
+      const body = raw ? JSON.parse(raw) : {};
       if (!res.ok) {
         setError(body.error || 'Generation failed');
+        setWarnings([]);
+        setDecisions([]);
         return;
       }
       setBashScript(body.bash_script || '');
@@ -204,6 +232,8 @@ export default function Page() {
     } catch (e) {
       if ((e as Error).name !== 'AbortError') {
         setError(String(e));
+        setWarnings([]);
+        setDecisions([]);
       }
     } finally {
       setPreviewLoading(false);
@@ -319,6 +349,7 @@ export default function Page() {
     const next = [{ name, config: payload }, ...presets.filter((p) => p.name !== name)];
     persistPresets(next);
     setPresetName('');
+    setError('');
   }
 
   function applyPreset(config: Record<string, unknown>) {
@@ -330,16 +361,16 @@ export default function Page() {
     setServiceCommunication((config.service_communication as string) || 'none');
 
     const cfgServices = (config.services as Service[]) || [];
-    setServices(cfgServices.length > 0 ? cfgServices : [{ name: 'users', port: 8081 }, { name: 'orders', port: 8082 }]);
+    setServices(cfgServices.length > 0 ? cfgServices : DEFAULT_SERVICES);
 
-    setInfra((config.infra as { redis: boolean; kafka: boolean; nats: boolean }) || { redis: false, kafka: false, nats: false });
-    setFeatures((config.features as typeof features) || features);
-    setFileToggles((config.file_toggles as typeof fileToggles) || fileToggles);
+    setInfra((config.infra as typeof DEFAULT_INFRA) || DEFAULT_INFRA);
+    setFeatures((config.features as typeof DEFAULT_FEATURES) || DEFAULT_FEATURES);
+    setFileToggles((config.file_toggles as typeof DEFAULT_FILE_TOGGLES) || DEFAULT_FILE_TOGGLES);
 
     const custom = (config.custom as Record<string, unknown>) || {};
     setCustomFolders(Array.isArray(custom.add_folders) ? (custom.add_folders as string[]).join(', ') : '');
     const models = Array.isArray(custom.models) ? (custom.models as SchemaModel[]) : [];
-    setSchemaModels(models.length > 0 ? models : [{ name: 'Item', fields: [{ name: 'id', type: 'int' }, { name: 'name', type: 'string' }] }]);
+    setSchemaModels(models.length > 0 ? models : DEFAULT_MODELS);
     const addFiles = Array.isArray(custom.add_files) ? (custom.add_files as CustomFileEntry[]) : [];
     setCustomFileEntries(addFiles.length > 0 ? addFiles : [{ path: '', content: '' }]);
     setRemoveFolders(Array.isArray(custom.remove_folders) ? (custom.remove_folders as string[]).join(', ') : '');
@@ -347,6 +378,7 @@ export default function Page() {
 
     const root = (config.root as Record<string, unknown>) || {};
     setRootMode((root.mode as string) || 'new');
+    setGitInit(typeof root.git_init === 'boolean' ? (root.git_init as boolean) : true);
     setRootName((root.name as string) || 'my-stacksprint-app');
     setRootPath((root.path as string) || '.');
     setModuleName((root.module as string) || 'github.com/example/my-stacksprint-app');
@@ -366,6 +398,38 @@ export default function Page() {
   const selectedFeatureCount = Object.values(features).filter(Boolean).length;
   const currentScript = activeScript === 'bash' ? bashScript : powerShellScript;
   const currentScriptName = activeScript === 'bash' ? 'Bash' : 'PowerShell';
+  const stepErrors = useMemo(() => {
+    const errors: string[] = [];
+    if (activeStep === 0 && architecture === 'microservices') {
+      if (services.length < 2 || services.length > 5) {
+        errors.push('Microservices mode requires 2 to 5 services.');
+      }
+      const seen = new Set<string>();
+      services.forEach((svc, index) => {
+        const name = svc.name.trim();
+        if (!SERVICE_NAME_REGEX.test(name)) {
+          errors.push(`Service ${index + 1} has invalid name.`);
+        }
+        const key = name.toLowerCase();
+        if (seen.has(key)) {
+          errors.push(`Duplicate service name: ${name || `service-${index + 1}`}.`);
+        }
+        seen.add(key);
+        if (!Number.isInteger(svc.port) || svc.port <= 0) {
+          errors.push(`Service ${index + 1} port must be a positive integer.`);
+        }
+      });
+    }
+    if (activeStep === 4) {
+      if (rootMode === 'new' && !rootName.trim()) {
+        errors.push('Root name is required for new mode.');
+      }
+      if (rootMode === 'existing' && !rootPath.trim()) {
+        errors.push('Root path is required for existing mode.');
+      }
+    }
+    return errors;
+  }, [activeStep, architecture, rootMode, rootName, rootPath, services]);
   const directorySet = useMemo(() => {
     const set = new Set<string>();
     for (const item of filePaths) {
@@ -410,6 +474,15 @@ export default function Page() {
               ))}
             </div>
           </article>
+
+          {stepErrors.length > 0 && (
+            <article className="section section-animated">
+              <div className="inline-errors">
+                <strong>Fix Before Continuing</strong>
+                {stepErrors.map((item) => <div key={item} className="inline-error-item">- {item}</div>)}
+              </div>
+            </article>
+          )}
 
           {activeStep === 0 && (
             <article className="section section-animated">
@@ -476,7 +549,8 @@ export default function Page() {
               </select>
             </div>
 
-            <div className={`microservices-panel ${architecture === 'microservices' ? 'open' : ''}`}>
+            {architecture === 'microservices' && (
+              <div className="microservices-panel open">
               <div className="stack">
                 {services.map((s, i) => (
                   <div className="row service-row" key={`${s.name}-${i}`}>
@@ -491,6 +565,14 @@ export default function Page() {
                       onChange={(e) => setServices(services.map((x, idx) => idx === i ? { ...x, port: Number(e.target.value) } : x))}
                       placeholder="port"
                     />
+                    <button
+                      type="button"
+                      className="ghost"
+                      disabled={services.length <= 2}
+                      onClick={() => setServices(services.filter((_, idx) => idx !== i))}
+                    >
+                      Remove
+                    </button>
                   </div>
                 ))}
                 <button
@@ -502,7 +584,8 @@ export default function Page() {
                 </button>
                 <div className="hint">Keep service count between 2 and 5.</div>
               </div>
-            </div>
+              </div>
+            )}
 
             <div className="field">
               <label>Service communication</label>
@@ -641,6 +724,15 @@ export default function Page() {
                 <option value="existing">Use existing root</option>
               </select>
             </div>
+            <label className="toggle orm-toggle">
+              <input
+                type="checkbox"
+                checked={gitInit}
+                disabled={rootMode === 'existing'}
+                onChange={(e) => setGitInit(e.target.checked)}
+              />
+              <span>Initialize git repository</span>
+            </label>
             <div className="field">
               {rootMode === 'new' ? (
                 <input value={rootName} onChange={(e) => setRootName(e.target.value)} placeholder="new root folder name" />
@@ -717,7 +809,7 @@ export default function Page() {
           <div className="actions">
             <div className="step-actions">
               <button type="button" className="ghost" disabled={activeStep === 0} onClick={() => setActiveStep((s) => Math.max(0, s - 1))}>Previous</button>
-              <button type="button" className="primary" disabled={activeStep === steps.length - 1} onClick={() => setActiveStep((s) => Math.min(steps.length - 1, s + 1))}>Next</button>
+              <button type="button" className="primary" disabled={activeStep === steps.length - 1 || stepErrors.length > 0} onClick={() => setActiveStep((s) => Math.min(steps.length - 1, s + 1))}>Next</button>
             </div>
             {error && <div className="error">{error}</div>}
           </div>
@@ -726,26 +818,54 @@ export default function Page() {
         <aside className="panel sticky">
           <article className="section section-animated">
             <div className="section-head">
+              <h2>Config Health</h2>
+              <span className="hint">{previewLoading ? 'Syncing' : 'Live synced'}</span>
+            </div>
+            <div className="review-grid">
+              <div className="review-item"><strong>Step:</strong> {steps[activeStep]}</div>
+              <div className="review-item"><strong>Warnings:</strong> {warnings.length}</div>
+              <div className="review-item"><strong>Decisions:</strong> {decisions.length}</div>
+              <div className="review-item"><strong>Paths:</strong> {filePaths.length}</div>
+            </div>
+          </article>
+
+          <article className="section section-animated">
+            <div className="section-head">
               <h2>Generated Output</h2>
-              <span className="hint">Download script and run locally</span>
+              <span className="hint">Live preview output</span>
             </div>
-            <p className="hint">After running your script, execute `docker compose up --build` in the generated project.</p>
-            <div className="preview-status">{previewLoading ? 'Updating live preview...' : 'Live preview synced'}</div>
-            <div className="result-stats">
-              <div className="result-stat">{filePaths.length} Paths</div>
-              <div className="result-stat">{decisions.length} Decisions</div>
-              <div className="result-stat">{warnings.length} Warnings</div>
+            <div className="download-row">
+              <button className={`ghost ${activeOutputTab === 'scripts' ? 'tab-active' : ''}`} type="button" onClick={() => setActiveOutputTab('scripts')}>Scripts</button>
+              <button className={`ghost ${activeOutputTab === 'decisions' ? 'tab-active' : ''}`} type="button" onClick={() => setActiveOutputTab('decisions')}>Decisions</button>
+              <button className={`ghost ${activeOutputTab === 'files' ? 'tab-active' : ''}`} type="button" onClick={() => setActiveOutputTab('files')}>Files</button>
             </div>
-            {warnings.length > 0 && (
-              <div className="warning-box">
-                <strong>Configuration Warnings</strong>
-                {warnings.map((warning) => <div key={warning} className="warning-item">- {warning}</div>)}
-              </div>
-            )}
-            {decisions.length > 0 && (
+
+            {activeOutputTab === 'scripts' && (
               <>
-                <label>Why This Was Generated</label>
+                <div className="download-row">
+                  <button className={`ghost ${activeScript === 'bash' ? 'tab-active' : ''}`} type="button" onClick={() => setActiveScript('bash')}>Bash</button>
+                  <button className={`ghost ${activeScript === 'powershell' ? 'tab-active' : ''}`} type="button" onClick={() => setActiveScript('powershell')}>PowerShell</button>
+                </div>
+                <div className="download-row">
+                  <button className="primary" disabled={!currentScript} onClick={() => download(activeScript === 'bash' ? 'stacksprint-init.sh' : 'stacksprint-init.ps1', currentScript)}>Download {currentScriptName}</button>
+                  <button className="ghost" disabled={!currentScript} onClick={() => copyToClipboard(currentScript, currentScriptName)}>Copy {currentScriptName}</button>
+                </div>
+                {copyStatus && <div className="copy-status">{copyStatus}</div>}
+                <label>{currentScriptName} Preview</label>
+                <pre>{currentScript || '# script preview will appear here after configuration is valid'}</pre>
+              </>
+            )}
+
+            {activeOutputTab === 'decisions' && (
+              <>
+                {warnings.length > 0 && (
+                  <div className="warning-box">
+                    <strong>Configuration Warnings</strong>
+                    {warnings.map((warning) => <div key={warning} className="warning-item">- {warning}</div>)}
+                  </div>
+                )}
                 <div className="decision-list">
+                  {decisions.length === 0 && <div className="file-tree-empty">No decisions yet.</div>}
                   {decisions.map((decision) => (
                     <div key={decision.code + decision.message} className="decision-item">
                       <div className="decision-meta">
@@ -758,32 +878,25 @@ export default function Page() {
                 </div>
               </>
             )}
-            <div className="download-row">
-              <button className={`ghost ${activeScript === 'bash' ? 'tab-active' : ''}`} type="button" onClick={() => setActiveScript('bash')}>Bash</button>
-              <button className={`ghost ${activeScript === 'powershell' ? 'tab-active' : ''}`} type="button" onClick={() => setActiveScript('powershell')}>PowerShell</button>
-            </div>
-            <div className="download-row">
-              <button className="primary" disabled={!currentScript} onClick={() => download(activeScript === 'bash' ? 'stacksprint-init.sh' : 'stacksprint-init.ps1', currentScript)}>Download {currentScriptName}</button>
-              <button className="ghost" disabled={!currentScript} onClick={() => copyToClipboard(currentScript, currentScriptName)}>Copy {currentScriptName}</button>
-              <button className="ghost" disabled={!currentScript} onClick={() => copyToClipboard(currentScript, 'Script')}>Copy Preview</button>
-            </div>
-            {copyStatus && <div className="copy-status">{copyStatus}</div>}
-            <label>Project Explorer</label>
-            <div className="file-tree">
-              {filePaths.length === 0 && <div className="file-tree-empty">No generated paths yet.</div>}
-              {filePaths.map((item) => {
-                const depth = item.split('/').filter(Boolean).length - 1;
-                const isDir = directorySet.has(item) || !item.includes('.');
-                return (
-                  <div key={item} className="file-tree-row" style={{ paddingLeft: `${depth * 14 + 8}px` }}>
-                    <span className="file-tree-icon">{isDir ? 'd' : 'f'}</span>
-                    <span>{item}</span>
-                  </div>
-                );
-              })}
-            </div>
-            <label>{currentScriptName} Preview</label>
-            <pre>{currentScript || '# script preview will appear here after configuration is valid'}</pre>
+
+            {activeOutputTab === 'files' && (
+              <>
+                <label>Project Explorer</label>
+                <div className="file-tree">
+                  {filePaths.length === 0 && <div className="file-tree-empty">No generated paths yet.</div>}
+                  {filePaths.map((item) => {
+                    const depth = item.split('/').filter(Boolean).length - 1;
+                    const isDir = directorySet.has(item) || !item.includes('.');
+                    return (
+                      <div key={item} className="file-tree-row" style={{ paddingLeft: `${depth * 14 + 8}px` }}>
+                        <span className="file-tree-icon">{isDir ? 'd' : 'f'}</span>
+                        <span>{item}</span>
+                      </div>
+                    );
+                  })}
+                </div>
+              </>
+            )}
           </article>
         </aside>
       </div>

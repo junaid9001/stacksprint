@@ -318,7 +318,9 @@ func buildCompose(req GenerateRequest) string {
 			b.WriteString(fmt.Sprintf("  %s:\n", svc.Name))
 			b.WriteString(fmt.Sprintf("    build: ./services/%s\n", svc.Name))
 			b.WriteString(fmt.Sprintf("    ports:\n      - \"%d:%d\"\n", svc.Port, svc.Port))
-			b.WriteString(fmt.Sprintf("    env_file:\n      - ./services/%s/.env\n", svc.Name))
+			if isEnabled(req.FileToggles.Env) {
+				b.WriteString(fmt.Sprintf("    env_file:\n      - ./services/%s/.env\n", svc.Name))
+			}
 			if req.Database != "none" {
 				b.WriteString("    depends_on:\n")
 				b.WriteString(fmt.Sprintf("      %s:\n        condition: service_healthy\n", composeDBServiceName(req.Database)))
@@ -378,23 +380,23 @@ func sampleMigration(db string, models []DataModel) string {
 	if db == "mongodb" {
 		return "// MongoDB migrations are usually handled by migration tools at runtime.\n"
 	}
-	return renderSQLTablesTemplate(models, false)
+	return renderSQLTablesTemplate(db, models, false)
 }
 
 func sampleDBInit(db string, models []DataModel) string {
 	if db == "mongodb" {
 		return "db = db.getSiblingDB('app');\ndb.createCollection('items');\n"
 	}
-	return renderSQLTablesTemplate(models, true)
+	return renderSQLTablesTemplate(db, models, true)
 }
 
-func renderSQLTablesTemplate(models []DataModel, withSeed bool) string {
+func renderSQLTablesTemplate(db string, models []DataModel, withSeed bool) string {
 	const tpl = `{{ range .Models -}}
 CREATE TABLE IF NOT EXISTS {{ .TableName }} (
-  id SERIAL PRIMARY KEY{{ range .Columns }},
+  id {{ $.IDColumn }}{{ range .Columns }},
   {{ .Name }} {{ .SQLType }}{{ end }}
 );
-{{ if $.WithSeed }}INSERT INTO {{ .TableName }} DEFAULT VALUES;
+{{ if $.WithSeed }}INSERT INTO {{ .TableName }} {{ $.SeedValues }};
 {{ end }}
 
 {{ end -}}`
@@ -408,8 +410,10 @@ CREATE TABLE IF NOT EXISTS {{ .TableName }} (
 		Columns   []sqlColumn
 	}
 	type sqlPayload struct {
-		WithSeed bool
-		Models   []sqlTable
+		WithSeed   bool
+		IDColumn   string
+		SeedValues string
+		Models     []sqlTable
 	}
 
 	resolved := resolvedModels(models)
@@ -436,7 +440,18 @@ CREATE TABLE IF NOT EXISTS {{ .TableName }} (
 		return ""
 	}
 	var b bytes.Buffer
-	if err := t.Execute(&b, sqlPayload{WithSeed: withSeed, Models: tables}); err != nil {
+	idColumn := "SERIAL PRIMARY KEY"
+	seedValues := "DEFAULT VALUES"
+	if db == "mysql" {
+		idColumn = "BIGINT PRIMARY KEY AUTO_INCREMENT"
+		seedValues = "() VALUES ()"
+	}
+	if err := t.Execute(&b, sqlPayload{
+		WithSeed:   withSeed,
+		IDColumn:   idColumn,
+		SeedValues: seedValues,
+		Models:     tables,
+	}); err != nil {
 		return ""
 	}
 	return b.String()

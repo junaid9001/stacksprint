@@ -3,11 +3,13 @@ package generator
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"runtime"
 	"slices"
+	"strings"
 	"testing"
 )
 
@@ -235,11 +237,12 @@ func runPowerShellSmoke(t *testing.T, script string) {
 
 func runBashSmoke(t *testing.T, script string) {
 	t.Helper()
-	if runtime.GOOS == "windows" {
-		t.Skip("bash smoke test is skipped on Windows")
-	}
-	if _, err := exec.LookPath("bash"); err != nil {
+	bashPath, err := exec.LookPath("bash")
+	if err != nil {
 		t.Skip("bash not found in PATH")
+	}
+	if err := verifyBashUsable(bashPath); err != nil {
+		t.Skipf("bash found but not usable: %v", err)
 	}
 
 	scriptPath := filepath.Join(t.TempDir(), "generated.sh")
@@ -247,11 +250,23 @@ func runBashSmoke(t *testing.T, script string) {
 		t.Fatalf("write bash script: %v", err)
 	}
 
-	cmd := exec.Command("bash", scriptPath)
+	cmd := exec.Command(bashPath, scriptPath)
 	out, err := cmd.CombinedOutput()
 	if err != nil {
 		t.Fatalf("bash smoke failed: %v\n%s", err, out)
 	}
+}
+
+func verifyBashUsable(bashPath string) error {
+	cmd := exec.Command(bashPath, "-lc", "echo ok")
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		return err
+	}
+	if strings.TrimSpace(string(out)) != "ok" {
+		return fmt.Errorf("unexpected bash probe output: %q", string(out))
+	}
+	return nil
 }
 
 func powershellCommand() (string, []string, bool) {

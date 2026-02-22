@@ -154,6 +154,8 @@ func (e *Engine) generateMonolith(tree *FileTree, req GenerateRequest) error {
 		addCRUDRoute(tree, req, "")
 	}
 	addInfraBoilerplate(tree, req, "")
+	addAutopilotBoilerplate(tree, req, "")
+	addDBRetry(tree, req, "")
 	if isEnabled(req.FileToggles.Dockerfile) {
 		addFile(tree, "Dockerfile", dockerfile(req, ""))
 	}
@@ -201,6 +203,8 @@ func (e *Engine) generateMicroservices(tree *FileTree, req GenerateRequest) erro
 			addCRUDRoute(tree, req, svcRoot)
 		}
 		addInfraBoilerplate(tree, req, svcRoot)
+		addAutopilotBoilerplate(tree, req, svcRoot)
+		addDBRetry(tree, req, svcRoot)
 		if strings.EqualFold(req.ServiceCommunication, "grpc") {
 			addGRPCBoilerplate(tree, req, svcRoot)
 		}
